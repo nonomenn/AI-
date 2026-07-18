@@ -11,6 +11,7 @@ import streamlit as st
 import config
 import db
 import pipeline
+from connectors import suno
 
 st.set_page_config(page_title="AMPS — AI Music Production System", layout="wide")
 db.init_db()
@@ -31,6 +32,13 @@ if st.sidebar.button("週次企画を今すぐ実行（Trend→PostInsights→CE
             st.sidebar.success(f"{result['week_of']} 週の企画を更新しました。")
         except Exception as exc:  # noqa: BLE001
             st.sidebar.error(f"失敗しました: {exc}")
+
+if config.SUNO_API_KEY:
+    st.sidebar.caption(
+        f"Suno音源生成：残り {suno.remaining_quota()} / {config.SUNO_MONTHLY_GENERATION_CAP} 回（今月）"
+    )
+else:
+    st.sidebar.caption("Suno音源生成：未設定（.envにSUNO_API_KEYを設定すると使えます）")
 
 
 def genre_ratio_chart(songs) -> None:
@@ -123,6 +131,30 @@ elif page == "レビューキュー":
             st.markdown(f"**Round {r['round']}：{r['score']}点（{r['verdict']}）**")
             with st.expander("詳細を見る"):
                 st.markdown(r["notes"])
+
+        st.markdown("### Suno音源生成")
+        if not config.SUNO_API_KEY:
+            st.caption("未設定：.envにSUNO_API_KEYを設定すると、ここから音源を自動生成できます。")
+        else:
+            gens = db.list_suno_generations(s["song_id"])
+            for g in gens:
+                if g["status"] == "done" and g["audio_local_path"]:
+                    st.audio(g["audio_local_path"])
+                elif g["status"] == "failed":
+                    st.caption(f"生成失敗：{g['error']}")
+            if st.button(f"Sunoで音源生成する（残り{suno.remaining_quota()}回/月）",
+                         key=f"suno_gen_{s['song_id']}"):
+                with st.spinner("Suno APIで音源を生成中（数分かかることがあります）..."):
+                    try:
+                        result = suno.generate_song(
+                            s["song_id"], prompt["style_prompt"], prompt["formatted_lyrics"], s["title"]
+                        )
+                        st.success(f"音源を生成しました：{result['audio_local_path']}")
+                        st.rerun()
+                    except suno.SunoQuotaExceeded as exc:
+                        st.error(str(exc))
+                    except Exception as exc:  # noqa: BLE001
+                        st.error(f"生成に失敗しました：{exc}")
 
         c1, c2 = st.columns(2)
         with c1:
@@ -246,3 +278,10 @@ elif page == "曲詳細":
                     st.markdown(f"**Round {r['round']}：{r['score']}点（{r['verdict']}）**")
                     st.markdown(r["notes"])
                     st.markdown("---")
+
+        gens = db.list_suno_generations(song_id)
+        done_gens = [g for g in gens if g["status"] == "done" and g["audio_local_path"]]
+        if done_gens:
+            with st.expander(f"生成済み音源（全{len(done_gens)}件）", expanded=True):
+                for g in done_gens:
+                    st.audio(g["audio_local_path"])

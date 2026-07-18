@@ -12,6 +12,11 @@ load_dotenv(BASE_DIR / ".env")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 AMPS_MODEL = os.getenv("AMPS_MODEL", "claude-sonnet-5")
 
+# Suno連携（Phase2オプション。任意の第三者Suno APIプロバイダーを想定した汎用設定）
+SUNO_API_KEY = os.getenv("SUNO_API_KEY", "")
+SUNO_API_BASE_URL = os.getenv("SUNO_API_BASE_URL", "https://api.sunoapi.org")
+SUNO_MODEL = os.getenv("SUNO_MODEL", "V4_5")
+
 AGENTS_DIR = BASE_DIR / "agents"
 BRAND_DIR = BASE_DIR / "brand"
 SONGS_DIR = BASE_DIR / "songs"
@@ -62,6 +67,11 @@ DAILY_AGENTS = ["market_research_agent"]
 
 # 「バズった」投稿の判定倍率（同プラットフォーム直近投稿平均の何倍で外れ値とみなすか）
 VIRAL_THRESHOLD_MULTIPLIER = 2.0
+
+# Suno音源生成の月間上限（課金プロバイダー側の設定に関わらず、ここで強制的に止める安全装置）。
+# 月30曲リリース・改稿込みで最大50曲相当を想定し、余裕を持って150回/月をデフォルト上限にする。
+# .envで SUNO_MONTHLY_GENERATION_CAP を設定すれば上書き可能。
+SUNO_MONTHLY_GENERATION_CAP = int(os.getenv("SUNO_MONTHLY_GENERATION_CAP", "150"))
 
 
 def ensure_dirs() -> None:

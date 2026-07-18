@@ -119,6 +119,19 @@ CREATE TABLE IF NOT EXISTS weekly_plans (
   content TEXT,
   created_at TEXT DEFAULT (datetime('now'))
 );
+
+-- Suno音源生成の実行ログ（月間上限チェックにも使う）
+CREATE TABLE IF NOT EXISTS suno_generations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  song_id INTEGER,
+  task_id TEXT,
+  status TEXT NOT NULL,        -- requested / done / failed / quota_blocked
+  audio_url TEXT,
+  audio_local_path TEXT,
+  error TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY(song_id) REFERENCES songs(song_id)
+);
 """
 
 
@@ -433,6 +446,46 @@ def get_latest_weekly_plan() -> Optional[sqlite3.Row]:
         return conn.execute(
             "SELECT * FROM weekly_plans ORDER BY id DESC LIMIT 1"
         ).fetchone()
+
+
+# ------------------------------------------------------------ suno_generations ----
+
+def count_suno_generations_this_month() -> int:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) AS n FROM suno_generations "
+            "WHERE status IN ('requested', 'done') "
+            "AND strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')"
+        ).fetchone()
+        return row["n"]
+
+
+def log_suno_generation(song_id: Optional[int], status: str, task_id: str = "",
+                         audio_url: str = "", audio_local_path: str = "", error: str = "") -> int:
+    with get_conn() as conn:
+        cur = conn.execute(
+            "INSERT INTO suno_generations (song_id, task_id, status, audio_url, audio_local_path, error) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (song_id, task_id, status, audio_url, audio_local_path, error),
+        )
+        return cur.lastrowid
+
+
+def update_suno_generation(gen_id: int, status: str, audio_url: str = "",
+                            audio_local_path: str = "", error: str = "") -> None:
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE suno_generations SET status = ?, audio_url = ?, audio_local_path = ?, error = ? "
+            "WHERE id = ?",
+            (status, audio_url, audio_local_path, error, gen_id),
+        )
+
+
+def list_suno_generations(song_id: int) -> list[sqlite3.Row]:
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT * FROM suno_generations WHERE song_id = ? ORDER BY id DESC", (song_id,)
+        ).fetchall()
 
 
 if __name__ == "__main__":

@@ -7,6 +7,7 @@
 
 - **Trend Analysis（外部市場トレンド）は週1回・毎週月曜のみ実行。** 日次では回さない。
 - **Post Insights Agent（新設）**：自分（自ブランド）のSNS投稿のうち**バズった投稿を検出し、なぜバズったかを分解して、次回の曲作り（Music Directorのブリーフ）に直接反映する**週次ループ。外部トレンドと自分の実績、両方をCEO Agentが週次企画の根拠にする。
+- **Suno音源生成の自動化（オプション）**：`connectors/suno.py`から第三者Suno APIプロバイダーを呼び出し、Sunoプロンプト→実際の音源ファイルまで自動生成できる。**月間生成回数の上限（既定150回）をコード側で強制**し、プロバイダーの課金プランに関わらず上限を超えて呼び出さない安全装置つき。
 
 ## セットアップ
 
@@ -51,13 +52,14 @@ amps/
 ├── songs/2026-07/001_kaerimichi/ ← 完成した1曲の実例（出力フォーマット基準）
 ├── database/                    ← 補助データ置き場（本体はamps.db、自動生成）
 ├── reports/                     ← 月次学習レポート
-└── connectors/                  ← Phase 2以降の外部連携用（今は空）
+└── connectors/suno.py           ← Suno音源生成（オプション、SUNO_API_KEY設定で有効化）
 ```
 
 ## 事前に用意するもの
 
 - Python 3.11+
 - Anthropic APIキー（`.env` に `ANTHROPIC_API_KEY=...`）
+- （任意）Suno音源生成を自動化したい場合：第三者Suno APIプロバイダーのAPIキー（`.env`に`SUNO_API_KEY`）。プリペイド・自動チャージOFFのプランを推奨。上限は`SUNO_MONTHLY_GENERATION_CAP`（既定150回/月）でコード側からも強制ブロックされる。
 
 ## 注意
 

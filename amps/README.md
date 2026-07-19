@@ -9,22 +9,33 @@
 - **Post Insights Agent（新設）**：自分（自ブランド）のSNS投稿のうち**バズった投稿を検出し、なぜバズったかを分解して、次回の曲作り（Music Directorのブリーフ）に直接反映する**週次ループ。外部トレンドと自分の実績、両方をCEO Agentが週次企画の根拠にする。
 - **Suno音源生成の自動化（オプション）**：`connectors/suno.py`から第三者Suno APIプロバイダーを呼び出し、Sunoプロンプト→実際の音源ファイルまで自動生成できる。**月間生成回数の上限（既定150回）をコード側で強制**し、プロバイダーの課金プランに関わらず上限を超えて呼び出さない安全装置つき。
 
-## セットアップ
+## セットアップ（ローカルPC）
 
+AMPSは常時起動して使うツールなので、**自分のPC（Mac/Windows）にこの`amps/`フォルダを置いて**セットアップする。
+
+### Mac / Linux
 ```bash
 cd amps
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env        # ANTHROPIC_API_KEY を設定
-python -c "import db; db.init_db()"
-streamlit run dashboard.py
+./setup.sh
 ```
+### Windows
+`amps`フォルダの中の `setup.bat` をダブルクリック（またはコマンドプロンプトで実行）。
 
-常時自動運転したい場合（日次市場調査ログ＋週次Trend/PostInsights/CEO企画）：
+どちらも、venv作成・依存パッケージインストール・`.env`作成・DB初期化まで自動でやってくれる。完了後：
+
+1. `.env` を開いて `ANTHROPIC_API_KEY` を設定（Suno音源生成を使うなら `SUNO_API_KEY` も）
+2. 起動：
+   ```bash
+   source .venv/bin/activate   # Windowsは .venv\Scripts\activate.bat
+   streamlit run dashboard.py
+   ```
+
+常時自動運転したい場合（日次市場調査ログ＋週次Trend/PostInsights/CEO企画）は、別ターミナルで：
 
 ```bash
 python scheduler.py
 ```
+を起動したままにしておく（PCのスリープを無効化推奨）。
 
 ## 使い方（ダッシュボード）
 
@@ -34,9 +45,14 @@ python scheduler.py
 4. **自分の投稿分析**：SNS投稿の実績（再生・いいね・保存・シェア等）を記録。バズった投稿を自動判定し、Post Insights Agentのレポート（次回の曲作りへの示唆）を確認できる。
 5. **曲詳細**：brief / 歌詞（版履歴）/ composition / suno_prompt / QC履歴を閲覧。
 
-## 初回テスト
+## 初回起動チェックリスト
 
-ダッシュボードの「新規企画」でテーマ「帰り道」を入力し、`songs/2026-07/001_kaerimichi/` と同じ流れ（企画→歌詞→設計→Sunoプロンプト→QC）が自動で再現されるか確認する。
+- [ ] `streamlit run dashboard.py` が起動し、ブラウザ（自動で開く。開かない場合は http://localhost:8501 ）で表示される
+- [ ] 「新規企画」でテーマ「帰り道」を入力→「制作開始」で、`songs/2026-07/001_kaerimichi/` と同様の一式（brief/lyrics/composition/suno_prompt/quality_review）が自動生成される
+- [ ] 「レビューキュー」に生成した曲が表示され、承認・差戻し（コメント付き）が動く
+- [ ] 「自分の投稿分析」で投稿実績を記録すると一覧に反映され、サイドバーの「週次企画を今すぐ実行」でPost Insightsレポートが生成される
+- [ ] （`SUNO_API_KEY`設定時のみ）レビューキュー/曲詳細でSuno音源生成ボタンが動き、試聴できる
+- [ ] `python scheduler.py` を起動したままにすると、毎週月曜にTrend Analysis→Post Insights→CEO企画が自動実行される
 
 ## 中身
 
@@ -46,6 +62,7 @@ amps/
 ├── CLAUDE.md                    ← Claude Codeが最初に読む全体指示
 ├── AMPS_システム設計書.md         ← 全体設計（13エージェント・ワークフロー）
 ├── AMPS_Phase1_実装指示書.md      ← Phase 1の実装仕様
+├── setup.sh / setup.bat         ← ローカル一括セットアップ（Mac・Windows）
 ├── config.py / db.py / pipeline.py / dashboard.py / scheduler.py  ← 実装本体
 ├── agents/                      ← 13エージェントのプロンプト定義 + runner.py（共通実行器）
 ├── brand/brand_guideline.md     ← 全エージェントの判断軸（ブランド憲法）

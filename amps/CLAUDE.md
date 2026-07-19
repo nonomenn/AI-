@@ -42,7 +42,7 @@ EDM / HipHop / Trap / K-POP / 演歌 / ジャズ 等は対象外。
 
 ## Suno音源生成（オプション、`connectors/suno.py`）
 
-- Suno公式は開発者向けAPIを一般公開していないため、第三者Suno APIプロバイダー経由での連携を前提にしている。
+- Suno公式は開発者向けAPIを一般公開していないため、第三者Suno APIプロバイダー（[EvoLink](https://evolink.ai/suno)を採用、99.9%稼働率SLA・自動フェイルオーバー）経由での連携を前提にしている。
 - `SUNO_API_KEY`が`.env`に設定されている場合のみ、ダッシュボードの「レビューキュー」「曲詳細」から音源生成ボタンが使える。
 - **月間生成回数の上限（`SUNO_MONTHLY_GENERATION_CAP`、既定150回）をコード側で強制**する。課金プロバイダーの設定に関わらず、上限に達したら`SunoQuotaExceeded`で呼び出し自体をブロックする。プロバイダー契約はプリペイド・自動チャージOFFを推奨。
 

@@ -1,8 +1,9 @@
 """AMPS connectors: Suno音源生成（Phase2オプション）。
 
-Suno公式は開発者向けAPIを一般公開していないため、ここでは第三者Suno APIプロバイダー
-（sunoapi.org / kie.ai系のエンドポイント仕様が主流）を想定した汎用クライアントにしている。
-別プロバイダーを使う場合は `_submit_generation` / `_poll_result` のエンドポイント・
+Suno公式は開発者向けAPIを一般公開していないため、ここでは第三者Suno APIプロバイダーの
+**EvoLink（https://evolink.ai/suno）を想定**したクライアントにしている
+（99.9%稼働率SLA・自動フェイルオーバーがあり、無人稼働するAMPSのパイプライン向けとして選定）。
+別プロバイダーに乗り換える場合は `_submit_generation` / `_poll_result` のエンドポイント・
 レスポンス項目名を、契約したプロバイダーのドキュメントに合わせて調整すること。
 
 ## 安全装置（重要）
@@ -75,44 +76,45 @@ def _extract_style_summary(style_prompt: str, max_len: int = 900) -> str:
 
 
 def _submit_generation(style_prompt: str, formatted_lyrics: str, title: str) -> str:
+    """EvoLink: POST /v1/audios/generations → {"id": "task-xxx", "status": "pending", ...}"""
     payload = {
+        "model": config.SUNO_MODEL,
         "prompt": formatted_lyrics,
         "style": _extract_style_summary(style_prompt),
         "title": title[:80],
-        "customMode": True,
+        "custom_mode": True,
         "instrumental": False,
-        "model": config.SUNO_MODEL,
     }
-    resp = requests.post(f"{config.SUNO_API_BASE_URL}/api/v1/generate",
+    resp = requests.post(f"{config.SUNO_API_BASE_URL}/v1/audios/generations",
                           json=payload, headers=_headers(), timeout=30)
     if resp.status_code != 200:
         raise SunoGenerationError(f"generate request failed: {resp.status_code} {resp.text[:500]}")
     data = resp.json()
-    task_id = (data.get("data") or {}).get("taskId") or data.get("taskId")
+    task_id = data.get("id") or data.get("task_id")
     if not task_id:
-        raise SunoGenerationError(f"taskId not found in response: {data}")
+        raise SunoGenerationError(f"task id not found in response: {data}")
     return task_id
 
 
 def _poll_result(task_id: str) -> dict:
+    """EvoLink: GET /v1/tasks/{task_id} → completed時 result_data[0].audio_url を取得。"""
     deadline = time.time() + POLL_TIMEOUT_SEC
     while time.time() < deadline:
-        resp = requests.get(f"{config.SUNO_API_BASE_URL}/api/v1/generate/record-info",
-                             params={"taskId": task_id}, headers=_headers(), timeout=30)
+        resp = requests.get(f"{config.SUNO_API_BASE_URL}/v1/tasks/{task_id}",
+                             headers=_headers(), timeout=30)
         if resp.status_code != 200:
             raise SunoGenerationError(f"poll request failed: {resp.status_code} {resp.text[:500]}")
-        data = resp.json().get("data") or {}
-        status = str(data.get("status", "")).upper()
-        if status in ("SUCCESS", "COMPLETE", "COMPLETED"):
-            tracks = ((data.get("response") or {}).get("sunoData")
-                      or data.get("sunoData") or [])
-            if not tracks:
-                raise SunoGenerationError(f"no tracks in completed response: {data}")
-            audio_url = tracks[0].get("audioUrl") or tracks[0].get("audio_url")
+        data = resp.json()
+        status = str(data.get("status", "")).lower()
+        if status in ("completed", "success", "succeeded"):
+            results = data.get("result_data") or data.get("results") or []
+            if not results:
+                raise SunoGenerationError(f"no results in completed response: {data}")
+            audio_url = results[0].get("audio_url") or results[0].get("audioUrl")
             if not audio_url:
-                raise SunoGenerationError(f"audioUrl not found in track: {tracks[0]}")
+                raise SunoGenerationError(f"audio_url not found in result: {results[0]}")
             return {"audio_url": audio_url, "raw": data}
-        if status in ("FAILED", "ERROR"):
+        if status in ("failed", "error"):
             raise SunoGenerationError(f"generation failed on provider side: {data}")
         time.sleep(POLL_INTERVAL_SEC)
     raise SunoGenerationError(f"polling timed out after {POLL_TIMEOUT_SEC}s (task_id={task_id})")

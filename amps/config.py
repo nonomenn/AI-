@@ -12,10 +12,10 @@ load_dotenv(BASE_DIR / ".env")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 AMPS_MODEL = os.getenv("AMPS_MODEL", "claude-sonnet-5")
 
-# Suno連携（Phase2オプション。任意の第三者Suno APIプロバイダーを想定した汎用設定）
+# Suno連携（Phase2オプション。EvoLink https://evolink.ai/suno を想定）
 SUNO_API_KEY = os.getenv("SUNO_API_KEY", "")
-SUNO_API_BASE_URL = os.getenv("SUNO_API_BASE_URL", "https://api.sunoapi.org")
-SUNO_MODEL = os.getenv("SUNO_MODEL", "V4_5")
+SUNO_API_BASE_URL = os.getenv("SUNO_API_BASE_URL", "https://api.evolink.ai")
+SUNO_MODEL = os.getenv("SUNO_MODEL", "suno-v4.5-beta")
 
 AGENTS_DIR = BASE_DIR / "agents"
 BRAND_DIR = BASE_DIR / "brand"

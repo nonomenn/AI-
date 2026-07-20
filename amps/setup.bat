@@ -1,30 +1,32 @@
 @echo off
-REM AMPS ローカルセットアップ（Windows用）
-REM 使い方: amps フォルダで setup.bat をダブルクリック、またはコマンドプロンプトで実行
+chcp 65001 > nul
+REM AMPS local setup (Windows)
+REM Usage: double-click setup.bat in the amps folder, or run it from Command Prompt
 
 cd /d "%~dp0"
 
 if not exist ".venv" (
-  echo venvを作成しています...
+  echo Creating venv...
   python -m venv .venv
 )
 
-echo 依存パッケージをインストールしています...
+echo Installing dependencies...
 call .venv\Scripts\activate.bat
 pip install --upgrade pip -q
 pip install -r requirements.txt -q
 
 if not exist ".env" (
   copy .env.example .env
-  echo .env を作成しました。ANTHROPIC_API_KEY を設定してください。
+  echo Created .env - please set ANTHROPIC_API_KEY in it.
 )
 
-echo DBを初期化しています...
+echo Initializing database...
 python -c "import db; db.init_db()"
 
 echo.
-echo セットアップ完了。
-echo 1^) .env を開いて ANTHROPIC_API_KEY を設定してください（Suno音源生成を使うなら SUNO_API_KEY も）
-echo 2^) 次のコマンドで起動できます：
-echo    .venv\Scripts\activate.bat ^&^& streamlit run dashboard.py
+echo Setup complete.
+echo Next steps:
+echo   1. Open .env and set ANTHROPIC_API_KEY (and SUNO_API_KEY if using Suno)
+echo   2. Run:  .venv\Scripts\activate.bat
+echo   3. Run:  streamlit run dashboard.py
 pause

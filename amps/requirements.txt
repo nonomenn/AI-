@@ -1,0 +1,5 @@
+anthropic
+streamlit
+apscheduler
+python-dotenv
+requests

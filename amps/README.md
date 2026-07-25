@@ -54,6 +54,44 @@ python scheduler.py
 - [ ] （`SUNO_API_KEY`設定時のみ）レビューキュー/曲詳細でSuno音源生成ボタンが動き、試聴できる
 - [ ] `python scheduler.py` を起動したままにすると、毎週月曜にTrend Analysis→Post Insights→CEO企画が自動実行される
 
+## 複数人で共有する場合（Tailscale + パスワード認証）
+
+1人が常時起動しているPCのダッシュボードに、もう1人が別のPC/ブラウザからアクセスして一緒に使う方法。**1人で使う場合はこの節は不要（読み飛ばしてOK）。**
+
+### 1. パスワードを設定する（必須）
+ホスト側（AMPSを起動する方）の `.env` に以下を追記する。
+```
+AMPS_DASHBOARD_PASSWORD=好きなパスワードを設定
+```
+これでダッシュボードにログイン画面が出るようになる（未設定のままだと誰でも入れてしまうので、共有する場合は必ず設定する）。
+
+### 2. Tailscaleを両方のPCに入れる
+[Tailscale](https://tailscale.com/)は無料の簡易VPN。インターネットに公開せず、お互いのPC同士だけを安全につなげる。
+
+1. ホスト側・参加する側、両方のPCで https://tailscale.com/download からインストールしてサインイン（各自のGoogle/Microsoftアカウント等でOK、同じアカウントである必要はない）
+2. ホスト側の管理画面 https://login.tailscale.com/admin/machines を開く
+3. 自分のPCの行の「…」メニュー→「Share...」→参加する人のメール（Tailscaleに登録したアドレス）を入力して招待する
+4. 相手が招待を承諾すると、お互いのPCが同じ仮想ネットワークに入る
+
+### 3. ホスト側：外部から見える形でダッシュボードを起動する
+通常の`streamlit run dashboard.py`だと自分のPCの中からしかアクセスできないため、次のように起動する。
+```bash
+streamlit run dashboard.py --server.address 0.0.0.0
+```
+
+### 4. ホスト側の Tailscale IP を確認する
+```bash
+tailscale ip -4
+```
+`100.x.y.z` のような数字が表示される（これがアクセス用のアドレス）。
+
+### 5. 参加する側：ブラウザでアクセスする
+Tailscaleを起動した状態で、ブラウザに
+```
+http://100.x.y.z:8501
+```
+（`100.x.y.z`は手順4で確認した番号）と入力する。パスワード入力画面が出れば成功。
+
 ## 中身
 
 ```

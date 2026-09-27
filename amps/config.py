@@ -12,6 +12,10 @@ load_dotenv(BASE_DIR / ".env")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 AMPS_MODEL = os.getenv("AMPS_MODEL", "claude-sonnet-5")
 
+# ダッシュボードの簡易パスワード保護（複数人でTailscale等を通じて共有する場合に設定）。
+# 空文字（未設定）なら認証なしで従来通り使える。
+AMPS_DASHBOARD_PASSWORD = os.getenv("AMPS_DASHBOARD_PASSWORD", "")
+
 # Suno連携（Phase2オプション。EvoLink https://evolink.ai/suno を想定）
 SUNO_API_KEY = os.getenv("SUNO_API_KEY", "")
 SUNO_API_BASE_URL = os.getenv("SUNO_API_BASE_URL", "https://api.evolink.ai")

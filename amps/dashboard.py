@@ -4,6 +4,7 @@
 """
 from __future__ import annotations
 
+import hmac
 from datetime import date
 
 import streamlit as st
@@ -14,6 +15,29 @@ import pipeline
 from connectors import suno
 
 st.set_page_config(page_title="AMPS — AI Music Production System", layout="wide")
+
+
+def _check_auth() -> bool:
+    """AMPS_DASHBOARD_PASSWORD が設定されている場合のみ、簡易パスワード認証を要求する。
+    未設定なら従来通り認証なしで使える（1人でローカル運用する場合はこのまま）。"""
+    if not config.AMPS_DASHBOARD_PASSWORD:
+        return True
+    if st.session_state.get("authenticated"):
+        return True
+    st.title("AMPS — ログイン")
+    password = st.text_input("パスワード", type="password")
+    if st.button("ログイン"):
+        if hmac.compare_digest(password, config.AMPS_DASHBOARD_PASSWORD):
+            st.session_state["authenticated"] = True
+            st.rerun()
+        else:
+            st.error("パスワードが違います。")
+    return False
+
+
+if not _check_auth():
+    st.stop()
+
 db.init_db()
 
 GENRE_LABELS = {k: v["label"] for k, v in config.GENRES.items()}

@@ -197,6 +197,10 @@ def run(args):
                              "src_start": p.src_start, "duration": p.duration, "speed": p.speed,
                              "room": p.room, "telop": p.telop, "transition_in": p.transition_in}
                             for st, p in zip(starts, plan)]}, f, ensure_ascii=False, indent=2)
+    from .review import cut_sheet
+    cs = cut_sheet(plan, starts, copy, props, fonts["sans_bold"], os.path.join(out_dir, f"{stem}_カット確認.jpg"))
+    if cs:
+        print(f"  カット確認シート: {cs}(部屋名と映像が合っているか、投稿前に確認)")
     if not args.plan_only:
         print("[5/5] 書き出し")
         render(plan, cfg, fonts, props, copy, out, bgm=bgm)

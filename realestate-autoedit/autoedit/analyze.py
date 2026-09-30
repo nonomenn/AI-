@@ -144,7 +144,7 @@ def analyze_clip(path: str, cfg: dict) -> tuple[list[Segment], dict]:
             glide = float(np.exp(-((sp - a["ideal_speed"]) ** 2) / (2 * a["ideal_speed_width"] ** 2)))
             sharpness = min(1.0, float(sharp_ratio[sl].mean()))
             score = 0.45 * steadiness + 0.35 * glide + 0.20 * sharpness
-            segs.extend(_split_long(Segment(
+            segs.extend(_split_long(a, Segment(
                 clip=path, start=round(float(st), 2), end=round(float(en), 2), fps=fps,
                 width=W, height=H, score=round(score, 3), speed=round(sp, 4),
                 direction=(float(sx[sl].mean()), float(sy[sl].mean()), float(sz[sl].mean())),
@@ -157,8 +157,9 @@ def analyze_clip(path: str, cfg: dict) -> tuple[list[Segment], dict]:
     return segs, debug
 
 
-def _split_long(seg: Segment, max_len: float = 4.6, target: float = 3.6) -> list[Segment]:
+def _split_long(a: dict, seg: Segment) -> list[Segment]:
     """長回しの1カット(家中を歩いて撮った素材など)は、部屋ごとに判定できるよう数秒単位に分割する。"""
+    max_len, target = a.get("split_max", 6.5), a.get("split_target", 5.0)
     if seg.duration <= max_len:
         return [seg]
     k = int(np.ceil(seg.duration / target))

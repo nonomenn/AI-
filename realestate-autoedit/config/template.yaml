@@ -7,7 +7,7 @@ sections:
   - id: hook              # 見所映像(掴み)
     telop: hook
     shots: 1
-    duration: 2.2
+    duration: 3.2          # コピーを読み切れて、映像も味わえる長さ
     prefer: [exterior, view, living, balcony]   # この順に探し、なければ「映え度」が高いカット
     by_beauty: true
     avoid: [bathroom, toilet, washroom, closet, corridor]
@@ -15,8 +15,10 @@ sections:
   - id: catch             # 物件キャッチ(立地・物件種別)
     telop: catch
     shots: 2
-    duration: 4.2
+    duration: 6.4
     prefer: [entrance_hall, exterior, genkan, view, living, dining]
+    distinct_rooms: true   # 2カットは別の場所から(同じ部屋の続きを2回見せない)
+    avoid_if_possible: [living]   # 主役の部屋は部屋紹介でじっくり見せるので、ほかに候補があればキャッチでは使わない
     by_beauty: true
     avoid: [bathroom, toilet, washroom, closet]   # 水回りはキャッチに使わない
 
@@ -27,19 +29,23 @@ sections:
   - id: start             # ルームツアーSTART
     telop: start
     shots: 1
-    duration: 2.0
-    prefer: [genkan, corridor, entrance_hall]
+    duration: 2.8
+    prefer: [corridor, genkan, entrance_hall]   # 廊下を進みながら「START」(現状の動画と同じ)
 
   - id: rooms             # 部屋紹介(部屋ごとに1〜2カット、部屋名テロップ付き)
     kind: rooms
-    per_shot: [2.6, 3.6]   # 1カットの尺の範囲(秒)
-    max_shots_per_room: 2
+    per_shot: [3.6, 5.2]   # 1カットの尺の範囲(秒)。映え度が高いカットほど長く見せる
+    max_shots_per_room: 1
+    shots_per_room: {living: 2}          # 主役の部屋だけ2カット
+    drop_order: [toilet, closet, washroom, japanese_room, western_room, dining]   # 尺が長いとき、先に落とす部屋
+    min_rooms: 4
+    max_room_shots: 6      # 部屋紹介のカット数の上限。多いと忙しく見えるので、減らして1カットを長く見せる
     order: [living, dining, kitchen, bedroom, western_room, japanese_room, closet, washroom, bathroom, toilet]
 
   - id: cta               # 映える映像 + コメント誘導
     telop: cta
     shots: 1
-    duration: 4.0
+    duration: 5.0
     prefer: [balcony, view, living]
     by_beauty: true
     avoid: [toilet, washroom, closet, corridor]

@@ -38,7 +38,8 @@ class ShotSource:
                 raise FileNotFoundError(f"広告画像を読めません: {shot.image}")
             self.static = self._cover(img)
         else:
-            self.fps = shot.seg.fps
+            # 30fps素材をスローにするときは、60fpsの中間コマを作ってからデコードする
+            self.fps = 60.0 if shot.interp else shot.seg.fps
 
     def _cover(self, img):
         """縦長キャンバスを埋めるよう拡大し、はみ出た分を中央で切る(横長素材はここで中央切り出し=予備)。"""
@@ -54,6 +55,10 @@ class ShotSource:
         length = sh.duration * sh.speed + 0.5
         vf = (f"scale={self.cw}:{self.ch}:force_original_aspect_ratio=increase:flags=lanczos,"
               f"crop={self.cw}:{self.ch}")
+        if sh.interp == "blend":
+            vf += ",framerate=fps=60"
+        elif sh.interp == "flow":
+            vf += ",minterpolate=fps=60:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1"
         cmd = ["ffmpeg", "-v", "error", "-ss", f"{sh.src_start:.3f}", "-i", sh.seg.clip, "-t", f"{length:.3f}",
                "-vf", vf, "-f", "rawvideo", "-pix_fmt", "bgr24", "-"]
         self.proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=10 ** 8)
@@ -100,20 +105,81 @@ def _blur(img, amount):
     return cv2.resize(small, (w, h), interpolation=cv2.INTER_LINEAR)
 
 
+def _zoom_img(img, z, blur=0.0):
+    h, w = img.shape[:2]
+    M = np.array([[z, 0, w / 2 - z * w / 2], [0, z, h / 2 - z * h / 2]], dtype=np.float32)
+    out = cv2.warpAffine(img, M, (w, h), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
+    return _blur(out, blur) if blur else out
+
+
+_warm_cache = {}
+
+
 def _transition(a, b, kind, p):
+    """トランジション。どれも派手さを抑え、ゆっくりなじませる。
+    dissolve       クロスディゾルブ
+    blur_dissolve  中間でふわっとぼける
+    light_leak     暖かい光がふわっと差し込み、その光の中で切り替わる
+    zoom_through   前のカットに少し寄りながらぼけ、次のカットが少し引いた状態から現れる
+    soft_wipe      境界をぼかした光の帯が左から右へ流れて切り替わる(カメラの横移動と相性が良い)
+    dip_black      一瞬だけ暗くなって切り替わる(章の区切り)
+    fade_white     白くなって切り替わる(広告の前後)
+    cut            そのまま切り替える(動きつなぎ)
+    """
     e = _ease(p)
     if kind == "blur_dissolve":
         amt = math.sin(math.pi * p)          # 中間で最大にぼける
         a2, b2 = _blur(a, amt), _blur(b, amt)
         return cv2.addWeighted(a2, 1 - e, b2, e, 0)
-    if kind in ("fade_white", "fade_black"):
+    if kind in ("fade_white", "fade_black", "dip_black"):
         c = np.full_like(a, 255 if kind == "fade_white" else 0)
+        if kind == "dip_black":            # 真っ黒にはしない(7割まで)
+            k = math.sin(math.pi * p) * 0.75
+            mix = cv2.addWeighted(a, 1 - e, b, e, 0)
+            return cv2.addWeighted(mix, 1 - k, c, k, 0)
         if p < 0.5:
             return cv2.addWeighted(a, 1 - _ease(p * 2), c, _ease(p * 2), 0)
         return cv2.addWeighted(c, 1 - _ease(p * 2 - 1), b, _ease(p * 2 - 1), 0)
+    if kind == "light_leak":
+        mix = cv2.addWeighted(a, 1 - e, b, e, 0).astype(np.float32)
+        h, w = a.shape[:2]
+        key = (h, w)
+        if key not in _warm_cache:        # 右上から差し込む暖色の光(やわらかいグラデーション)
+            yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
+            d = np.hypot((xx - w * 0.85) / w, (yy - h * 0.15) / h)
+            g = np.clip(1.0 - d / 0.9, 0, 1) ** 1.6
+            _warm_cache[key] = np.dstack([g * 170, g * 225, g * 255]).astype(np.float32)  # BGR(暖色)
+        k = math.sin(math.pi * p) ** 1.5
+        glow = _warm_cache[key] * k
+        out = 255 - (255 - mix) * (255 - glow) / 255   # スクリーン合成
+        return np.clip(out, 0, 255).astype(np.uint8)
+    if kind == "zoom_through":
+        za = 1.0 + 0.12 * _ease(p)
+        zb = 1.12 - 0.12 * _ease(p)
+        amt = math.sin(math.pi * p) * 0.6
+        return cv2.addWeighted(_zoom_img(a, za, amt), 1 - e, _zoom_img(b, zb, amt), e, 0)
+    if kind == "soft_wipe":
+        h, w = a.shape[:2]
+        feather = 0.45
+        x = np.linspace(0, 1, w, dtype=np.float32)
+        pos = -feather + (1 + 2 * feather) * e
+        m = np.clip((pos - x) / feather + 0.5, 0, 1)
+        m = m * m * (3 - 2 * m)
+        m3 = np.repeat(m[None, :, None], h, 0)
+        out = a.astype(np.float32) * (1 - m3) + b.astype(np.float32) * m3
+        band = np.exp(-((x - pos) / (feather * 0.35)) ** 2) * 0.35 * math.sin(math.pi * p)  # 境目にうっすら光
+        out = 255 - (255 - out) * (1 - band[None, :, None])
+        return np.clip(out, 0, 255).astype(np.uint8)
     if kind == "cut":
-        return b
+        return a if p < 0.5 else b
     return cv2.addWeighted(a, 1 - e, b, e, 0)  # dissolve
+
+
+TRANSITION_NAMES = {
+    "blur_dissolve": "ぼかしディゾルブ(現行)", "dissolve": "クロスディゾルブ", "light_leak": "ライトリーク(光が差し込む)",
+    "zoom_through": "ズームスルー(寄って抜ける)", "soft_wipe": "ソフトワイプ(光の帯が流れる)", "dip_black": "ディップ(一瞬暗く)",
+    "cut": "カット(動きつなぎ)",
+}
 
 
 def _composite(frame: np.ndarray, layer: Layer, alpha: float, dx: float, dy: float):

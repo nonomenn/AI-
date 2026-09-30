@@ -183,6 +183,8 @@ room は次から選ぶ: {room_types}
 {floorplan_hint}
 beauty(0〜10)の基準: 高級感・明るさ・構図の美しさ・その物件の魅力(眺望、デザイン照明、広さ)が伝わるか。
 is_transit: ドアを通過中、壁や床しか映っていない、部屋から部屋への移動途中など「見せ場ではない」カットなら true。
+same_room: 3コマすべてで、その部屋が主役として映っているなら true。途中で廊下・ドア・別の部屋に移る
+(例: 廊下を歩いて洗面所に入る途中)なら false。false のカットには部屋名テロップを付けず、使わない。
 note: 10文字程度の内容メモ。"""
 
 
@@ -193,8 +195,9 @@ def _classify_schema(room_types):
             "type": "object",
             "properties": {"id": {"type": "string"}, "room": {"type": "string", "enum": room_types},
                            "beauty": {"type": "number"}, "is_transit": {"type": "boolean"},
-                           "note": {"type": "string"}},
-            "required": ["id", "room", "beauty", "is_transit", "note"], "additionalProperties": False}}},
+                           "same_room": {"type": "boolean"}, "note": {"type": "string"}},
+            "required": ["id", "room", "beauty", "is_transit", "same_room", "note"],
+            "additionalProperties": False}}},
         "required": ["cuts"], "additionalProperties": False,
     }
 
@@ -238,8 +241,8 @@ def classify_segments(segs: list[Segment], room_types: list[str], floorplan: dic
                 continue
             s.room = _coerce_room(r.get("room", "other"), allowed)
             s.beauty = max(0.0, min(10.0, float(r.get("beauty", 5))))
-            s.is_transit = bool(r.get("is_transit", False))
-            s.note = str(r.get("note", ""))
+            s.is_transit = bool(r.get("is_transit", False)) or not r.get("same_room", True)
+            s.note = str(r.get("note", "")) + ("" if r.get("same_room", True) else " (途中で場所が変わる→不使用)")
         log(f"  AI判定 {min(b + batch, len(segs))}/{len(segs)} カット")
 
 
@@ -253,7 +256,7 @@ def label_from_filename(segs: list[Segment]) -> None:
                 break
 
 
-def apply_manual_labels(segs: list[Segment], labels_path: str) -> None:
+def apply_manual_labels(segs: list[Segment], labels_path: str, min_len: float = 1.5, pad: float = 0.3) -> None:
     """手動ラベル(labels.yaml)の適用。
     書式:
       clip_02.mp4: dining                    # クリップ全体
@@ -272,6 +275,14 @@ def apply_manual_labels(segs: list[Segment], labels_path: str) -> None:
             continue
         for r in spec:
             if r["from"] <= s.mid < r["to"]:
+                # カットが範囲からはみ出していたら、範囲の内側だけに縮める
+                # (はみ出した部分には別の場所=廊下など が映っているため。はみ出したまま部屋名を付けない)
+                s.start = round(max(s.start, r["from"] + (pad if s.start < r["from"] else 0)), 2)
+                s.end = round(min(s.end, r["to"] - (pad if s.end > r["to"] else 0)), 2)
+                if s.end - s.start < min_len:
+                    s.is_transit = True
+                    s.note = (r.get("note", "") + " 短すぎるため不使用").strip()
+                    break
                 s.room = r["room"]
                 s.beauty = float(r.get("beauty", s.beauty))
                 s.is_transit = bool(r.get("transit", False))

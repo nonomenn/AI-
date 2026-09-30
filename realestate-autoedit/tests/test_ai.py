@@ -131,3 +131,16 @@ def test_run_intake_without_ai_writes_template(tmp_path):
     assert intake.run_intake(pj, use_ai=False, log=lambda *_: None) is False
     props = yaml.safe_load(open(pj.property_path, encoding="utf-8"))
     assert props["hook"] and "○○駅" in props["catch"]
+
+
+def test_manual_labels_trim_to_range(tmp_path):
+    """廊下→洗面所の境目をまたぐカットに「洗面」を付けない(範囲の内側だけに縮める)。"""
+    lab = tmp_path / "labels.yaml"
+    lab.write_text("walk.mov:\n  - {from: 16, to: 23, room: other, transit: true}\n"
+                   "  - {from: 23, to: 27, room: washroom, beauty: 6}\n", encoding="utf-8")
+    mk = lambda a, b: Segment(clip="/x/walk.mov", start=a, end=b, fps=30, width=1080, height=1920, id=f"w{a}")
+    straddle = mk(21.0, 26.0)      # 中央23.5 → 洗面の範囲だが、21〜23は廊下
+    too_short = mk(19.0, 24.0)     # 中央21.5 → 廊下(移動中)
+    vision.apply_manual_labels([straddle, too_short], str(lab))
+    assert straddle.room == "washroom" and straddle.start >= 23.3 and straddle.end <= 26.0
+    assert too_short.is_transit

@@ -23,16 +23,20 @@ analyze:
   max_shake: 0.035         # 手ブレ量の上限
   min_sharpness_ratio: 0.30  # クリップ内中央値に対するシャープネス比の下限(ブレ・ピンボケ除外)
   trim_edges: 0.2          # 区間の両端を少し削って、動き出し/止まりを避ける
+  split_max: 6.5           # これより長い安定区間は分割する(長回しを部屋ごとに判定するため)
+  split_target: 5.0        # 分割するときの1区間の長さ
 
 # ---------- 見せ方(ゆっくり・上品) ----------
 motion:
-  slow_speed: 0.8          # 60fps素材のときの再生速度(0.8 = 少しスロー)。30fps素材は1.0のまま
+  slow_speed: 0.8          # 60fps素材の再生速度(0.8 = 少しスロー)
   slow_min_fps: 50
+  low_fps_speed: 0.8       # 60fps未満(30fps)の素材の再生速度。中間コマを作ってなめらかにスローにする
+  low_fps_interp: blend    # 中間コマの作り方: blend(前後のコマを混ぜる・速い) / flow(動きを推定・高画質だが約30倍遅い) / none(スローにしない)
   push_in: [1.00, 1.04]    # 各カットでゆっくり寄る(Ken Burns)。開始倍率→終了倍率
 
 transitions:
-  same_room:   {type: dissolve,      duration: 0.45}   # 同じ部屋の中のカット間
-  room_change: {type: blur_dissolve, duration: 0.80}   # 部屋が変わるとき(一番上品に見せる所)
+  same_room:   {type: dissolve,      duration: 0.8}    # 同じ部屋の中のカット間
+  room_change: {type: blur_dissolve, duration: 1.1}    # 部屋が変わるとき(一番上品に見せる所)
   to_ad:       {type: fade_white,    duration: 0.50}
   from_ad:     {type: fade_white,    duration: 0.50}
   default:     {type: dissolve,      duration: 0.50}
@@ -57,19 +61,22 @@ fonts:
     [NotoSansCJK-Bold.ttc, NotoSansJP-Bold.otf, NotoSansCJKjp-Bold.otf, NotoSansJP-Bold.ttf, "ヒラギノ角ゴシック W6.ttc", YuGothB.ttc]
 
 # ---------- テロップ ----------
+# 影は「くっきりしたドロップシャドウ + 広くやわらかい影」の重ねがけ。明るい白壁の上でも読めるようにする
 telops:
-  hook:            # 冒頭の見所「誰もが憧れる、この空間」
+  hook:            # 冒頭の見所(動画冒頭テロップ)
     font: heavy_serif
     size: 84
     center_y: 450
     max_width: 960
     color: [255, 255, 255]
     italic_skew: 0.12            # 斜体の傾き
-    shadow: {offset: [7, 7], blur: 3, color: [0, 0, 0], opacity: 0.85}
-    fade_in: 0.25
-    fade_out: 0.25
+    shadow:
+      - {offset: [0, 0], blur: 22, spread: 6, color: [0, 0, 0], opacity: 0.55}   # 文字の周りを暗くする広い影
+      - {offset: [7, 7], blur: 2, color: [0, 0, 0], opacity: 0.95}              # くっきりした黒のドロップシャドウ
+    fade_in: 0.35
+    fade_out: 0.3
 
-  catch:           # キャッチ「阿波座駅3分の / デザイナーズマンション」+ 傍点
+  catch:           # キャッチ + 傍点
     font: heavy_serif
     size: 78
     center_y: 470
@@ -77,37 +84,47 @@ telops:
     max_width: 1000
     color: [255, 255, 255]
     italic_skew: 0.12
-    shadow: {offset: [7, 7], blur: 3, color: [0, 0, 0], opacity: 0.85}
-    emphasis_dot: {radius: 12, gap_above: 14}   # 傍点(●)
-    fade_in: 0.3
+    shadow:
+      - {offset: [0, 0], blur: 22, spread: 6, color: [0, 0, 0], opacity: 0.55}
+      - {offset: [7, 7], blur: 2, color: [0, 0, 0], opacity: 0.95}
+    emphasis_dot:
+      radius: 12
+      gap_above: 14
+      blink: {period: 0.9, min_alpha: 0.12}    # 傍点だけ点滅(周期・いちばん暗いときの濃さ)
+    fade_in: 0.35
     fade_out: 0.3
 
-  start:           # 「ルームツアー START」横に流れる
+  start:           # 「ルームツアー START」両側から集まって現れ、最後は左右に分かれて消える
     font: sans_bold
     size: 50
     center_y: 960
     letter_spacing: 34
     color: [255, 255, 255]
     italic_skew: 0.18
-    shadow: {offset: [3, 3], blur: 4, color: [0, 0, 0], opacity: 0.5}
-    move_from_x: 120             # 左方向へ流れる(開始オフセット→終了オフセット)
-    move_to_x: -320
-    fade_in: 0.2
-    fade_out: 0.6
+    shadow:
+      - {offset: [0, 0], blur: 14, spread: 3, color: [0, 0, 0], opacity: 0.5}
+      - {offset: [3, 3], blur: 2, color: [0, 0, 0], opacity: 0.8}
+    enter_spread: 60             # 現れるとき、左右この距離(px × 端からの位置)から中央へ
+    exit_spread: 320             # 消えるとき、左右へ分かれる距離(px)
+    fade_in: 0.5
+    fade_out: 0.7
 
   room:            # 部屋紹介「Living / 暮らしの中心になる心地よい空間」
+    # 書体とサイズは現状の Premiere テキストスタイル(Zen Antique 90px / 45px)
     title_font: latin_serif
-    title_size: 88
+    title_size: 90
     sub_font: serif_bold
-    sub_size: 36
+    sub_size: 45
     center_y: 330                # 英字タイトルの中心
-    sub_gap: 22
+    sub_gap: 18
     color: [255, 255, 255]
-    shadow: {offset: [3, 3], blur: 6, color: [0, 0, 0], opacity: 0.8}
-    fade_in: 0.7                 # ふわっと出す
+    shadow:
+      - {offset: [0, 0], blur: 20, spread: 5, color: [0, 0, 0], opacity: 0.6}
+      - {offset: [4, 5], blur: 3, color: [0, 0, 0], opacity: 0.85}
+    fade_in: 0.8                 # ふわっと出す
     rise: 14                     # 出るときに少し浮き上がる(px)
-    fade_out: 0.4
-    delay: 0.35                  # カット頭から少し遅らせて出す
+    fade_out: 0.5
+    delay: 0.4                   # カット頭から少し遅らせて出す
 
   cta:             # 「気になった方は詳細とコメント✓」+ 矢印
     font: sans_bold
@@ -119,21 +136,24 @@ telops:
     box: {pad_x: 28, pad_y: 14, border: 4, border_color: [255, 255, 255], fill: [0, 0, 0], fill_opacity: 0.35}
     check_icon: true
     fade_in: 0.4
-    # ---- 矢印:TikTokのアカウントアイコンを正確に指す ----
-    # target = アイコン中心の推定位置(1080x1920 動画座標)。画面録画から採寸:
-    #   アイコン中心 ≒ (953, 960) = 画面右端・縦のちょうど真ん中、半径 ≒ 54px
-    # 現状の動画は矢印が水平で先端が(878,897)付近 → アイコンより左上にズレていた
+    # ---- 矢印:TikTokのアカウントアイコンを真横から指す ----
+    # target = アイコン中心の推定位置(1080x1920 動画座標)。画面録画から採寸: 中心 ≒ (953, 960)、半径 ≒ 54px
     arrow:
       target: [953, 960]
       target_radius: 54
-      gap: 14                    # アイコンの縁から矢印の先端までの隙間
-      length: 190
-      angle_deg: 18              # 水平から下向きの角度(左上から右下へアイコンを指す)
-      thickness: 14
-      head: 46
+      gap: 16                    # アイコンの縁から矢印の先端までの隙間
+      angle_deg: 0               # 0 = 真横(左から右へ)
+      length: 250
+      thickness: 15              # 付け根の太さ
+      tail_width: 5              # 尾の太さ(尾に向かって細く・透明になる)
+      head: 54                   # 矢じりの長さ
+      head_width: 64
+      notch: 0.62                # 矢じり後ろの切れ込み(0〜1)
       color: [255, 255, 255]
-      shadow_opacity: 0.45
-      nudge: {amplitude: 12, period: 0.9}   # 先端方向にツンツン動かして目線を誘導
+      shadow:
+        - {offset: [0, 0], blur: 12, spread: 7, color: [0, 0, 0], opacity: 0.7}
+        - {offset: [3, 4], blur: 2, spread: 1, color: [0, 0, 0], opacity: 0.8}
+      nudge: {amplitude: 14, period: 1.1}   # 先端方向にツンと動かして目線を誘導
 
 # ---------- サムネイル(黒×ゴールドのテンプレート。完成見本 No.L030〜L032 から採寸) ----------
 # 比率 1149×1369 は固定(変えない)。変えてよいのは文言・写真・物件番号だけ

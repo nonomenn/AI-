@@ -22,9 +22,9 @@ sections:
     by_beauty: true
     avoid: [bathroom, toilet, washroom, closet]   # 水回りはキャッチに使わない
 
-  - id: ad                # 広告(静止画)
+  - id: ad                # 広告(静止画)。動かさずに2.5秒見せる
     kind: image
-    duration: 2.0
+    duration: 2.5
 
   - id: start             # ルームツアーSTART
     telop: start
@@ -37,7 +37,9 @@ sections:
     per_shot: [3.6, 5.2]   # 1カットの尺の範囲(秒)。映え度が高いカットほど長く見せる
     max_shots_per_room: 1
     shots_per_room: {living: 2}          # 主役の部屋だけ2カット
-    drop_order: [toilet, closet, washroom, japanese_room, western_room, dining]   # 尺が長いとき、先に落とす部屋
+    # 尺が長い(またはカットが多い)とき、先に落とすもの。second_cuts = 同じ部屋の2カット目
+    # 水回り(洗面・浴室)は物件の見どころなので後ろに。ダイニングはLDKのカットに映ることが多いので先に
+    drop_order: [toilet, closet, second_cuts, japanese_room, dining, washroom, western_room]
     min_rooms: 4
     max_room_shots: 6      # 部屋紹介のカット数の上限。多いと忙しく見えるので、減らして1カットを長く見せる
     order: [living, dining, kitchen, bedroom, western_room, japanese_room, closet, washroom, bathroom, toilet]
@@ -49,6 +51,14 @@ sections:
     prefer: [balcony, view, living]
     by_beauty: true
     avoid: [toilet, washroom, closet, corridor]
+
+# 区画(区画が変わるところだけ、やわらかいトランジションで「章が変わった」と見せる)
+zones:
+  public:  [living, dining, kitchen]
+  private: [bedroom, western_room, japanese_room, closet]
+  water:   [washroom, bathroom, toilet]
+  outside: [exterior, entrance_hall, balcony, view]
+  entry:   [genkan, corridor]
 
 # 部屋の種類(AIの判定ラベル)
 room_types:

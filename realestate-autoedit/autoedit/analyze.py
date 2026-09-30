@@ -190,3 +190,43 @@ def analyze_all(paths: list[str], cfg: dict, log=print) -> tuple[list[Segment], 
         all_segs.extend(segs)
         debug[p] = dbg
     return all_segs, debug
+
+
+def signature_from_image(img):
+    """同じ場所・同じ向きの映像かを比べるための特徴点(ORB)。img は BGR。"""
+    g = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) if img.ndim == 3 else img
+    kps, desc = cv2.ORB_create(1500).detectAndCompute(g, None)
+    if desc is None or len(kps) < 10:
+        return None
+    return np.float32([k.pt for k in kps]), desc
+
+
+def visual_signature(clip: str, t: float):
+    from .media import grab_frame
+    f = grab_frame(clip, t, width=360)
+    return signature_from_image(f) if f is not None else None
+
+
+def attach_signatures(segs: list[Segment]) -> None:
+    """使う候補の区間(移動中を除く)に、中央のコマの特徴点を付ける。planner が「同じ映像の2回使い」を避けるのに使う。"""
+    for s in segs:
+        if not s.is_transit:
+            s.sig = visual_signature(s.clip, s.mid)
+
+
+_bf = cv2.BFMatcher(cv2.NORM_HAMMING)
+
+
+def similarity(a: Segment, b: Segment) -> int:
+    """2つのカットの中央のコマで、同じ視点として矛盾なく対応が取れる特徴点の数(多いほど同じ映像)。
+    同じ場所を同じ向きから撮ったカットは数十〜百以上、別の場所・別の向きは 0〜十数。"""
+    sa, sb = getattr(a, "sig", None), getattr(b, "sig", None)
+    if sa is None or sb is None:
+        return 0
+    (pa, da), (pb, db) = sa, sb
+    m = _bf.knnMatch(da, db, k=2)
+    good = [x[0] for x in m if len(x) == 2 and x[0].distance < 0.75 * x[1].distance]
+    if len(good) < 8:
+        return 0
+    H, mask = cv2.findHomography(pa[[g.queryIdx for g in good]], pb[[g.trainIdx for g in good]], cv2.RANSAC, 5.0)
+    return int(mask.sum()) if mask is not None else 0

@@ -183,6 +183,8 @@ def run(args):
               f"  安定{s.score:.2f}{'  (移動中→不使用)' if s.is_transit else ''}  {s.note}")
 
     print("[4/5] 構成の組み立て")
+    from .analyze import attach_signatures
+    attach_signatures(segs)   # 同じ構図のカットを2回使わないための指紋
     plan = build_plan(segs, cfg, tpl, ad)
     starts, total = timeline(plan)
     for st, p in zip(starts, plan):
@@ -206,7 +208,30 @@ def run(args):
         render(plan, cfg, fonts, props, copy, out, bgm=bgm)
 
     print("[+] サムネイル・投稿文")
-    make_post_assets(args, cfg, fonts, props, plan, out_dir, stem, base_dir, counter, thumb_photo)
+    num, thumb_path, post_path = make_post_assets(args, cfg, fonts, props, plan, out_dir, stem, base_dir, counter,
+                                                  thumb_photo)
+    if args.project and not args.plan_only:
+        publish(pj, num, out, thumb_path, post_path)
+
+
+def publish(pj, num, video, thumb, post_txt):
+    """完成フォルダ(project.yaml の publish_dir)に、物件ごとに 動画・サムネ・キャプション をまとめる。
+    publish_dir を Google ドライブ(パソコン版)の同期フォルダにすれば、そのままドライブに保存される。"""
+    import shutil
+    from .project import load_layout
+    L = load_layout()
+    base = L.get("publish_dir")
+    if not base:
+        return
+    base = base if os.path.isabs(os.path.expanduser(base)) else os.path.join(pj.root, base)
+    name = f"No.{num}_{pj.name}"
+    d = os.path.normpath(os.path.join(os.path.expanduser(base), name))
+    os.makedirs(d, exist_ok=True)
+    shutil.copy2(video, os.path.join(d, f"{name}.mp4"))
+    if thumb:
+        shutil.copy2(thumb, os.path.join(d, f"{name}_サムネ.jpg"))
+    shutil.copy2(post_txt, os.path.join(d, f"{name}_キャプション.txt"))
+    print(f"[完成] {d}")
 
 
 def make_post_assets(args, cfg, fonts, props, plan, out_dir, stem, base_dir, counter, thumb_photo=None):
@@ -216,6 +241,7 @@ def make_post_assets(args, cfg, fonts, props, plan, out_dir, stem, base_dir, cou
 
     num = normalize_number(args.number or props.get("number") or next_number(counter))
     th = props.get("thumbnail") or {}
+    tp, photo = None, None
     info = props.get("info") or {}
     problems = []
     if th.get("title"):
@@ -248,6 +274,7 @@ def make_post_assets(args, cfg, fonts, props, plan, out_dir, stem, base_dir, cou
     print(f"  {pp}  (No.{num})")
     for p in problems:
         print(f"  ⚠ {p}")
+    return num, (tp if th.get("title") and photo is not None else None), pp
 
 
 if __name__ == "__main__":

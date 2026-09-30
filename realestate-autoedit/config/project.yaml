@@ -13,7 +13,9 @@
 #      property.yaml       ← intake が自動生成(文言を直したいときはここを編集)
 #      floorplan.json      ← intake が自動生成(間取り図の読み取り結果)
 #    物件番号.txt は 共通/ に自動で作られる(最後に使った No.L###。次の物件は +1)
-#      出力/               ← 書き出し先(物件名.mp4・_サムネ.jpg・_投稿.txt・_plan.json)
+#      出力/               ← 作業用の書き出し先(物件名.mp4・_サムネ.jpg・_投稿.txt・_plan.json・_カット確認.jpg)
+#    完成/                 ← 投稿するものだけを物件ごとにまとめる(publish_dir)
+#      No.L036_アルモニー千里/  動画.mp4・サムネ.jpg・キャプション.txt
 # ============================================================
 
 materials_dir: 素材
@@ -22,6 +24,11 @@ property_file: property.yaml
 floorplan_file: floorplan.json
 facts_file: 物件情報.json      # intake が読み取った物件情報(確認用)
 common_dir: ../共通           # 物件フォルダからの相対パス
+
+# 完成フォルダ: 物件ごとに「No.L036_物件名/」を作り、動画・サムネ・キャプションをまとめて入れる
+# Google ドライブ(パソコン版)の同期フォルダを指定すると、そのままドライブに保存される
+#   例(Windows): G:/マイドライブ/完成動画   例(Mac): ~/Library/CloudStorage/GoogleDrive-xxx/マイドライブ/完成動画
+publish_dir: ../完成          # 物件フォルダからの相対パス、または絶対パス
 
 common:
   ad: [広告, ad]               # 共通/ 直下のこの名前の画像(拡張子は問わない)

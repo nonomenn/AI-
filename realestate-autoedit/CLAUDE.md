@@ -24,4 +24,7 @@
   `python -m autoedit --clips samples/clips --property samples/property_demo.yaml --labels samples/labels_demo.yaml --override samples/demo_override.yaml --out out/demo.mp4 --no-ai`
 - CTAの矢印は TikTok のアカウントアイコン(中心 ≒ (953, 960))を指すこと。`python -m autoedit.preview` で確認する
 - 派手なトランジション(スライド、スピン、グリッチなど)は入れない。上品でゆっくりが方針
+- トランジションの基本はカット。やわらかい切り替えは章の切れ目(広告の前後・ツアー開始・区画の切り替え・最後の見せ場)だけ(SPEC 5章)
+- 同じ映像(同じ場所・同じ向き)は別ファイルでも2回使わない(`analyze.similarity`)。部屋名テロップは、その部屋が映っている範囲の内側のカットにだけ付ける
+- 完成品は `完成/No.L###_物件名/` に 動画・サムネ・キャプション をまとめる(`project.yaml` の publish_dir)
 - `物件動画/` と `out/` はコミットしない(撮影素材・物件資料は外部の方の著作物・個人情報を含む)

@@ -244,7 +244,7 @@ def render(plan: list[Shot], cfg: dict, fonts: dict, props: dict, copy: dict, ou
         src = sources[i].get(max(0.0, u))
         prog = u / s.duration if s.duration else 0
         if s.image:
-            z = 1.0 + 0.03 * prog
+            z = 1.0 + cfg["motion"].get("ad_zoom", 0.0) * prog
         else:
             z = z0 + (z1 - z0) * prog
         return _zoomed(src, W, H, z / sources[i].cw * W)  # 素材は1.08倍の余白付きでデコードしている

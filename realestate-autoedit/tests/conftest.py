@@ -12,14 +12,25 @@ sys.path.insert(0, ROOT)
 
 
 def make_clip(path, seconds=4.0, speed_px=60, fps=60, size=(540, 960)):
-    """テストパターンをゆっくり横に流した縦長クリップ(speed_px: 1秒あたりの移動px)。"""
+    """クリップごとに違う模様を、ゆっくり横に流した縦長クリップ(speed_px: 1秒あたりの移動px)。
+    模様はファイル名から決まる乱数で作る(同じ模様だと「同じ映像」とみなされて2回使われないため)。"""
+    import zlib
+
+    import cv2
+    import numpy as np
     w, h = size
     src_w = w + int(speed_px * seconds) + 40
+    rng = np.random.default_rng(zlib.crc32(os.path.basename(path).encode()))
+    tex = cv2.resize((rng.random((h // 8, src_w // 8, 3)) * 255).astype(np.uint8), (src_w, h),
+                     interpolation=cv2.INTER_CUBIC)
+    tex = cv2.addWeighted(tex, 0.7, (rng.random((h, src_w, 3)) * 255).astype(np.uint8), 0.3, 0)
+    png = path + ".tex.png"
+    cv2.imwrite(png, tex)
     vf = f"crop={w}:{h}:x='min({src_w - w},t*{speed_px})':y=0"
-    cmd = ["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i",
-           f"testsrc2=size={src_w}x{h}:rate={fps}:duration={seconds}", "-vf", vf,
-           "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p"]
-    subprocess.run(cmd + [path], check=True)
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-loop", "1", "-framerate", str(fps), "-t", str(seconds),
+                    "-i", png, "-vf", vf, "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", path],
+                   check=True)
+    os.remove(png)
     return path
 
 

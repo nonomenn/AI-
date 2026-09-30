@@ -36,7 +36,13 @@ def test_project_mode_end_to_end(tmp_path):
     assert os.path.basename(plan["bgm"]) == "song.m4a" and os.path.basename(plan["ad"]) == "広告.png"
     secs = [x["section"] for x in plan["plan"]]
     assert secs[0] == "hook" and "ad" in secs and secs[-1] == "cta"
-    assert all(x["speed"] == 0.8 for x in plan["plan"] if x["section"] != "ad")  # 60fps素材は0.8倍
+    # 60fps素材は0.8倍。カメラが速いカットほどさらにスロー(下限0.5倍)
+    assert all(0.5 <= x["speed"] <= 0.8 for x in plan["plan"] if x["section"] != "ad")
     a = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=duration",
                         "-of", "csv=p=0", str(out)], capture_output=True, text=True).stdout.strip()
     assert abs(float(a) - plan["total"]) < 0.2  # BGMがループして最後まで鳴る
+    # 完成フォルダに、物件ごとに 動画・キャプション がまとまる(番号の指定が無いので L001)
+    done = root / "完成" / "No.L001_阿波座テスト"
+    assert (done / "No.L001_阿波座テスト.mp4").is_file()
+    cap = (done / "No.L001_阿波座テスト_キャプション.txt").read_text(encoding="utf-8")
+    assert "No.L001" in cap and "【L001】" in cap

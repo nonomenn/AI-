@@ -25,6 +25,8 @@ analyze:
   trim_edges: 0.2          # 区間の両端を少し削って、動き出し/止まりを避ける
   split_max: 6.5           # これより長い安定区間は分割する(長回しを部屋ごとに判定するため)
   split_target: 5.0        # 分割するときの1区間の長さ
+  duplicate_inliers: 25    # 中央のコマで対応の取れる特徴点がこれ以上あるカット同士は「同じ映像」とみなし、2回使わない
+                           # (実測: 同じ映像 48〜119、別の映像 0〜16)
 
 # ---------- 見せ方(ゆっくり・上品) ----------
 motion:
@@ -32,14 +34,23 @@ motion:
   slow_min_fps: 50
   low_fps_speed: 0.8       # 60fps未満(30fps)の素材の再生速度。中間コマを作ってなめらかにスローにする
   low_fps_interp: blend    # 中間コマの作り方: blend(前後のコマを混ぜる・速い) / flow(動きを推定・高画質だが約30倍遅い) / none(スローにしない)
+  # カメラが速く動いているカットほど、さらにスローにする(目標の見かけの速さに近づける)
+  adaptive_slow: {target_speed: 0.12, min_speed_60fps: 0.5, min_speed_30fps: 0.7}
+  ad_zoom: 0.0             # 広告画像は動かさない(寄ると文字が読みにくい)
   push_in: [1.00, 1.04]    # 各カットでゆっくり寄る(Ken Burns)。開始倍率→終了倍率
 
+# ---------- トランジション(基本はカット。意味のある切れ目だけ、やわらかく切り替える) ----------
+# 毎回トランジションを入れると映像がうるさくなるので、基本はカット(動きつなぎ)。
+# 1本の動画でやわらかい切り替えは4〜5回まで。どこで使うかで「章が変わった」と伝わるようにする
 transitions:
-  same_room:   {type: dissolve,      duration: 0.8}    # 同じ部屋の中のカット間
-  room_change: {type: blur_dissolve, duration: 1.1}    # 部屋が変わるとき(一番上品に見せる所)
-  to_ad:       {type: fade_white,    duration: 0.50}
-  from_ad:     {type: fade_white,    duration: 0.50}
-  default:     {type: dissolve,      duration: 0.50}
+  base:            {type: cut,           duration: 0.0}   # (7) 基本。前後で動きの向きがそろっていればカットでつなぐ
+  motion_mismatch: {type: dissolve,      duration: 0.6}   # (2) 前後で動きの向きが逆(左パン→右パン等)で、カットだとガクッとするとき
+  zone_change:     {type: blur_dissolve, duration: 1.0}   # (1) 区画が変わるとき(LDK→水回り、水回り→個室 など。template.yaml の zones)
+  tour_start:      {type: blur_dissolve, duration: 1.0}   # (1) START → 最初の部屋(ルームツアーの始まり)
+  to_cta:          {type: light_leak,    duration: 1.2}   # (3) 最後の見せ場(眺望・バルコニー)へ。1本に1回だけ
+  to_ad:           {type: dissolve,      duration: 0.5}   # (2) 広告の前後
+  from_ad:         {type: dissolve,      duration: 0.5}
+  motion_tolerance: 0.06    # 横の動きがこれより小さいカットは「ほぼ止まっている」とみなし、どの向きともカットでつなげる
   ending_fade: 0.0          # 最後に黒へフェード(秒)。TikTokのループ再生を考えて初期値は0
 
 # ---------- フォント ----------

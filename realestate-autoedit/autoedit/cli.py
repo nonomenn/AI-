@@ -17,6 +17,8 @@ import json
 import os
 import sys
 
+import cv2
+import numpy as np
 import yaml
 
 from . import vision
@@ -74,7 +76,8 @@ def build_parser():
     ap.add_argument("--override", help="style.yaml の一部を上書きするyaml")
     ap.add_argument("--no-ai", action="store_true", help="Claude APIを使わない")
     ap.add_argument("--regen-property", action="store_true", help="物件資料から property.yaml を作り直す")
-    ap.add_argument("--plan-only", action="store_true", help="構成表だけ作って書き出さない")
+    ap.add_argument("--plan-only", action="store_true", help="構成表だけ作って書き出さない(サムネ・投稿文は作る)")
+    ap.add_argument("--number", help="物件番号(例: L036)。property.yaml の number より優先")
     return ap
 
 
@@ -96,6 +99,9 @@ def run(args):
     use_ai = not args.no_ai and vision.ai_available()
 
     font_dir = None
+    counter = None
+    base_dir = None
+    thumb_photo = None
     floorplan_arg = args.floorplan
     if args.project:
         from .intake import run_intake
@@ -113,6 +119,9 @@ def run(args):
         if not floorplan_arg and os.path.exists(pj.floorplan_path):
             floorplan_arg = pj.floorplan_path
         font_dir = pj.font_dir
+        counter = os.path.join(pj.common_dir, "物件番号.txt") if pj.common_dir else None
+        thumb_photo = pj.thumb_photo
+        base_dir = pj.root
         props = _load(prop_path)
         ad = args.ad or _resolve(props.get("ad_image"), pj.root) or pj.ad
         bgm = args.bgm or pj.pick_bgm(props.get("bgm"))
@@ -123,6 +132,7 @@ def run(args):
         prop_path, out = args.property, args.out
         props = _load(prop_path)
         pdir = os.path.dirname(os.path.abspath(prop_path))
+        base_dir = pdir
         ad = args.ad or _resolve(props.get("ad_image"), pdir)
         bgm = args.bgm or _resolve(props.get("bgm"), pdir)
 
@@ -187,11 +197,53 @@ def run(args):
                              "src_start": p.src_start, "duration": p.duration, "speed": p.speed,
                              "room": p.room, "telop": p.telop, "transition_in": p.transition_in}
                             for st, p in zip(starts, plan)]}, f, ensure_ascii=False, indent=2)
-    if args.plan_only:
-        return
+    if not args.plan_only:
+        print("[5/5] 書き出し")
+        render(plan, cfg, fonts, props, copy, out, bgm=bgm)
 
-    print("[5/5] 書き出し")
-    render(plan, cfg, fonts, props, copy, out, bgm=bgm)
+    print("[+] サムネイル・投稿文")
+    make_post_assets(args, cfg, fonts, props, plan, out_dir, stem, base_dir, counter, thumb_photo)
+
+
+def make_post_assets(args, cfg, fonts, props, plan, out_dir, stem, base_dir, counter, thumb_photo=None):
+    from .media import grab_frame
+    from .post import build_caption, check_post, next_number, normalize_number, record_number, write_post_text
+    from .thumbnail import render_thumbnail
+
+    num = normalize_number(args.number or props.get("number") or next_number(counter))
+    th = props.get("thumbnail") or {}
+    info = props.get("info") or {}
+    problems = []
+    if th.get("title"):
+        photo = None
+        if th.get("photo") or thumb_photo:
+            path = _resolve(th["photo"], base_dir or "") if th.get("photo") else thumb_photo
+            if not os.path.isfile(path):
+                sys.exit(f"サムネ用の写真が見つかりません: {path}")
+            photo = cv2.imdecode(np.fromfile(path, dtype=np.uint8), cv2.IMREAD_COLOR)
+        else:  # 写真の指定が無ければ、動画の外観(無ければ見所)カットの中央から切り出す
+            shots = [p for p in plan if p.seg]
+            best = next((p for p in shots if p.room == "exterior"), None) or next(
+                (p for p in shots if p.section == "hook"), shots[0] if shots else None)
+            if best:
+                photo = grab_frame(best.seg.clip, best.src_start + best.duration * best.speed / 2)
+        if photo is None:
+            problems.append("サムネ用の写真がありません")
+        else:
+            tp = os.path.join(out_dir, f"{stem}_サムネ.jpg")
+            render_thumbnail(cfg, fonts, th["title"], th.get("sub", ""), th.get("bar", []), photo,
+                             f"No.{num}", tp, float(th.get("focus_y", 0.4)))
+            print(f"  {tp}")
+    else:
+        problems.append("property.yaml に thumbnail(title/sub/bar)が無いためサムネを作っていません")
+    caption = build_caption(num, props.get("caption_heading", ""), props.get("caption", ""))
+    problems += check_post(num, props, caption, th, info.get("property_name", ""))
+    pp = os.path.join(out_dir, f"{stem}_投稿.txt")
+    write_post_text(pp, num, props, caption, problems)
+    record_number(counter, num)
+    print(f"  {pp}  (No.{num})")
+    for p in problems:
+        print(f"  ⚠ {p}")
 
 
 if __name__ == "__main__":

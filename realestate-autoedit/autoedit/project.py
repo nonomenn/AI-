@@ -42,6 +42,7 @@ class Project:
     ad: str | None = None
     bgms: list[str] = field(default_factory=list)
     font_dir: str | None = None
+    thumb_photo: str | None = None
 
     @property
     def out_video(self) -> str:
@@ -68,7 +69,12 @@ def open_project(root: str, layout: dict | None = None) -> Project:
     name = os.path.basename(root.rstrip(os.sep))
     mat = os.path.join(root, L["materials_dir"])
     clips = _files(mat, L["video_ext"])
-    docs = _files(root, L["doc_ext"])
+    files = _files(root, L["doc_ext"])
+    thumb_words = [w.lower() for w in L.get("thumb_photo_words", [])]
+    is_thumb = [any(w in os.path.basename(f).lower() for w in thumb_words) and f.lower().endswith(tuple(L["image_ext"]))
+                for f in files]
+    docs = [f for f, t in zip(files, is_thumb) if not t]
+    thumb_photo = next((f for f, t in zip(files, is_thumb) if t), None)
 
     common = os.path.normpath(os.path.join(root, L["common_dir"]))
     common = common if os.path.isdir(common) else None
@@ -96,5 +102,5 @@ def open_project(root: str, layout: dict | None = None) -> Project:
         floorplan_path=os.path.join(root, L["floorplan_file"]),
         facts_path=os.path.join(root, L["facts_file"]),
         out_dir=os.path.join(root, L["output_dir"]),
-        common_dir=common, ad=ad, bgms=bgms, font_dir=font_dir,
+        common_dir=common, ad=ad, bgms=bgms, font_dir=font_dir, thumb_photo=thumb_photo,
     )

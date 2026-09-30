@@ -46,9 +46,13 @@ fonts:
   heavy_serif:   # 見所・キャッチ(極太明朝)
     [NotoSerifCJK-Black.ttc, NotoSerifJP-Black.otf, NotoSerifCJKjp-Black.otf, NotoSerifJP-Black.ttf, "ヒラギノ明朝 ProN.ttc", yumindb.ttf]
   serif_bold:    # 部屋紹介のサブコピー
+    [ZenAntique-Regular.ttf, NotoSerifCJK-Bold.ttc, NotoSerifJP-Bold.otf, NotoSerifCJKjp-Bold.otf, NotoSerifJP-Bold.ttf, "ヒラギノ明朝 ProN.ttc", yumindb.ttf]
+  latin_serif:   # 部屋名(英字セリフ)。今の動画の Premiere テキストスタイルは Zen Antique
+    [ZenAntique-Regular.ttf, NotoSerifCJK-Regular.ttc, NotoSerifJP-Regular.otf, NotoSerifCJKjp-Regular.otf, NotoSerifJP-Regular.ttf, "ヒラギノ明朝 ProN.ttc", yumin.ttf]
+  heavy_serif_thumb:   # サムネのタイトル(極太明朝)
+    [NotoSerifCJK-Black.ttc, NotoSerifJP-Black.otf, NotoSerifCJKjp-Black.otf, NotoSerifJP-Black.ttf, "ヒラギノ明朝 ProN.ttc", yumindb.ttf]
+  serif_bold_thumb:    # サムネのサブ・情報バー・物件番号
     [NotoSerifCJK-Bold.ttc, NotoSerifJP-Bold.otf, NotoSerifCJKjp-Bold.otf, NotoSerifJP-Bold.ttf, "ヒラギノ明朝 ProN.ttc", yumindb.ttf]
-  latin_serif:   # 部屋名(英字セリフ)
-    [NotoSerifCJK-Regular.ttc, NotoSerifJP-Regular.otf, NotoSerifCJKjp-Regular.otf, NotoSerifJP-Regular.ttf, "ヒラギノ明朝 ProN.ttc", yumin.ttf]
   sans_bold:     # CTA・ルームツアーSTART
     [NotoSansCJK-Bold.ttc, NotoSansJP-Bold.otf, NotoSansCJKjp-Bold.otf, NotoSansJP-Bold.ttf, "ヒラギノ角ゴシック W6.ttc", YuGothB.ttc]
 
@@ -130,3 +134,21 @@ telops:
       color: [255, 255, 255]
       shadow_opacity: 0.45
       nudge: {amplitude: 12, period: 0.9}   # 先端方向にツンツン動かして目線を誘導
+
+# ---------- サムネイル(黒×ゴールドのテンプレート。完成見本 No.L030〜L032 から採寸) ----------
+# 比率 1149×1369 は固定(変えない)。変えてよいのは文言・写真・物件番号だけ
+thumbnail:
+  width: 1149
+  height: 1369
+  fonts: {title: heavy_serif_thumb, text: serif_bold_thumb}
+  gold: [[255, 238, 178], [236, 196, 112], [196, 142, 58], [150, 100, 36]]   # 上→下のグラデーション
+  line_gold: [201, 160, 84]
+  white: [250, 248, 242]
+  frame: {inset: 9, width: 2}                    # 外枠のゴールド線
+  glow: {y: 42, width: 440, height: 3}          # 最上部の光るライン
+  title: {center_y: 128, size: 82, max_width: 1080, digit_scale: 1.22, kana_scale: 0.84}
+  sub: {center_y: 214, size: 44, max_width: 1040}
+  bar: {x0: 40, x1: 1108, y0: 276, y1: 362, border: 2, size: 36, color: [240, 222, 172]}
+  photo: {x0: 33, y0: 384, x1: 1116, y1: 1258, radius: 26, border: 3}
+  play: {center: [574, 790], radius: 112, stroke: 11}
+  number: {center_y: 1308, size: 50, line_len: 125, line_gap: 38, line_width: 2}

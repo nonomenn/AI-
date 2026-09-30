@@ -46,11 +46,20 @@ FACTS_SCHEMA = {
             },
             "required": ["found", "source", "layout", "rooms"], "additionalProperties": False,
         },
+        "built": {"type": "string"},
+        "conditions": {"type": "array", "items": {"type": "string"}},
         "hook_candidates": {"type": "array", "items": {"type": "string"}},
         "catch_candidates": {"type": "array", "items": {"type": "string"}},
+        "thumb_title": {"type": "string"},
+        "thumb_sub": {"type": "string"},
+        "thumb_bar": {"type": "array", "items": {"type": "string"}},
+        "post_title": {"type": "string"},
+        "caption_heading": {"type": "string"},
+        "caption_body": {"type": "string"},
     },
     "required": ["property_name", "building_type", "station", "line", "walk_minutes", "layout", "area_m2",
-                 "features", "floorplan", "hook_candidates", "catch_candidates"],
+                 "features", "floorplan", "built", "conditions", "hook_candidates", "catch_candidates",
+                 "thumb_title", "thumb_sub", "thumb_bar", "post_title", "caption_heading", "caption_body"],
     "additionalProperties": False,
 }
 
@@ -63,6 +72,7 @@ TikTok用ルームツアー動画(高級賃貸・TOALU ESTATE)のために、次
  - station / line / walk_minutes: 最寄駅(「駅」を含む表記。例: 阿波座駅)・路線・徒歩分数。複数あれば一番近いもの
  - layout / area_m2: 間取りタイプ(例: 1LDK)・専有面積(㎡)
  - features: 動画の見どころになる特徴を最大6個、短く(例: 天井高2.7m、アイランドキッチン、南向きバルコニー)
+ - built: 築年月・竣工(例: 2026年8月竣工)。conditions: ペット・SOHO・階数・方角などの条件(資料にあるものだけ)
 
 2. floorplan: 間取り図の読み取り。source には間取り図が載っていたファイル名(PDFならファイル名とページ)。
 {floorplan_rules}
@@ -75,6 +85,21 @@ TikTok用ルームツアー動画(高級賃貸・TOALU ESTATE)のために、次
  - 一番刺さる語(多くは駅名)を《》で1か所だけ囲む(その文字の上に傍点が付く)
  - 例: 「《阿波座駅》3分の\\nデザイナーズマンション」
  - 資料に無い事実は書かない。徒歩分数・駅名は資料どおり
+
+5. サムネイル(黒×ゴールドの固定テンプレートに入れる文言。デザインは変えない)
+ - thumb_title: 1行・全角16文字以内。その物件で一番訴求力の高い特徴(駅徒歩・立地・新築・高層階・眺望・広さ・
+   タワーマンション・サウナなどの希少設備・デザイン・ペット可など)を、スクロールを止める上品なコピーに。
+   ゴールドにする語を《》で囲む(1〜2か所)。例: 「《北浜エリア駅徒歩6分》の好立地。」「《31階の高層階》×《南向き》の開放感。」
+ - thumb_sub: 1行・全角22文字以内の白い補足。例: 「充実設備のハイグレードレジデンス。」
+ - thumb_bar: 情報バーの3項目。各 全角9文字以内。例: ["個室サウナ付き", "26畳の広々リビング", "駅徒歩6分"]
+ - サムネには物件名(建物名)を絶対に入れない
+6. post_title: 投稿タイトル。短く、エリア・駅・新築・広さなど検索されやすい語を自然に入れる
+7. キャプション
+ - caption_heading: 【】の中に入る見出し。例: 「大阪・梅田｜31階から望む新築タワーレジデンス」
+ - caption_body: 本文。駅・徒歩分数、新築・築年月、間取り・面積、特徴、条件を、SEOを意識しつつ自然な文章で。
+   キーワードの不自然な羅列は禁止。物件番号・見出し・DM誘導はこちらで付けるので本文に書かない
+ - ハッシュタグ・家賃・独立した物件情報一覧は書かない
+ - 「神物件」「ヤバすぎる」「住まないと損」などの安っぽい煽りは禁止。高級賃貸アカウントとしての品を保つ
 
 コピーの注意(不動産の表示に関する公正競争規約): 「完全」「完璧」「絶対」「日本一」「最高」「抜群」「格安」「超」など、
 根拠を示せない最上級・断定表現は使わないこと。"""
@@ -171,17 +196,29 @@ def property_yaml(hook: str, catch: str, facts: dict | None, others: list[str], 
         out.append("# 読み取った資料: " + ", ".join(os.path.basename(s) for s in sources))
     for n in notes:
         out.append(f"# ⚠ {n}")
-    out += [f"hook: {_q(hook)}",
+    out += ["# number: L036        # 物件番号。未指定なら 共通/物件番号.txt の次の番号",
+            f"hook: {_q(hook)}   # 動画冒頭テロップ",
             f"catch: {_q(catch)}   # 《》で囲んだ文字の上に傍点(●)。\\n で改行",
             'cta: "気になった方は詳細とコメント"']
     if others:
         out.append("# ほかの案:")
         out += [f"#   {o.replace(chr(10), ' / ')}" for o in others]
     if facts:
+        bar = [b.strip() for b in facts.get("thumb_bar", [])][:3]
+        out += ["", "# サムネイル(《》で囲んだ部分がゴールド)",
+                "thumbnail:",
+                f"  title: {_q(facts.get('thumb_title', ''))}",
+                f"  sub: {_q(facts.get('thumb_sub', ''))}",
+                f"  bar: {json.dumps(bar, ensure_ascii=False)}",
+                "  # photo: サムネ写真.jpg   # 物件フォルダ内の写真。未指定なら自動で選ぶ",
+                "", f"post_title: {_q(facts.get('post_title', ''))}",
+                f"caption_heading: {_q(facts.get('caption_heading', '').strip('【】'))}",
+                "caption: |"]
+        out += ["  " + ln if ln.strip() else "" for ln in (facts.get("caption_body") or "").strip().splitlines()]
         out.append("")
         out.append("# 資料から読み取った物件情報(確認用。動画には直接使わない)")
         info = {k: facts.get(k) for k in ("property_name", "building_type", "station", "line", "walk_minutes",
-                                           "layout", "area_m2", "features")}
+                                           "layout", "area_m2", "built", "features", "conditions")}
         out.append("info: " + json.dumps(info, ensure_ascii=False))
     out += ["",
             "# bgm: 曲名.mp3        # 共通/BGM/ の中から選ぶ(未指定は名前順で先頭)",

@@ -1,0 +1,65 @@
+# ============================================================
+#  動画の構成テンプレート(現状のTOALU動画の構成を踏襲)
+#  見所映像 → 広告 → 部屋紹介 → 映える映像 + コメント誘導
+# ============================================================
+
+sections:
+  - id: hook              # 見所映像(掴み)
+    telop: hook
+    shots: 1
+    duration: 2.2
+    prefer: [exterior, view, living, balcony]   # この順に探し、なければ「映え度」が高いカット
+    by_beauty: true
+    avoid: [bathroom, toilet, washroom, closet, corridor]
+
+  - id: catch             # 物件キャッチ(立地・物件種別)
+    telop: catch
+    shots: 2
+    duration: 4.2
+    prefer: [entrance_hall, exterior, genkan, view, living, dining]
+    by_beauty: true
+    avoid: [bathroom, toilet, washroom, closet]   # 水回りはキャッチに使わない
+
+  - id: ad                # 広告(静止画)
+    kind: image
+    duration: 2.0
+
+  - id: start             # ルームツアーSTART
+    telop: start
+    shots: 1
+    duration: 2.0
+    prefer: [genkan, corridor, entrance_hall]
+
+  - id: rooms             # 部屋紹介(部屋ごとに1〜2カット、部屋名テロップ付き)
+    kind: rooms
+    per_shot: [2.6, 3.6]   # 1カットの尺の範囲(秒)
+    max_shots_per_room: 2
+    order: [living, dining, kitchen, bedroom, western_room, japanese_room, closet, washroom, bathroom, toilet]
+
+  - id: cta               # 映える映像 + コメント誘導
+    telop: cta
+    shots: 1
+    duration: 4.0
+    prefer: [balcony, view, living]
+    by_beauty: true
+    avoid: [toilet, washroom, closet, corridor]
+
+# 部屋の種類(AIの判定ラベル)
+room_types:
+  exterior:      外観
+  entrance_hall: エントランス・共用部
+  genkan:        玄関
+  corridor:      廊下
+  living:        リビング
+  dining:        ダイニング
+  kitchen:       キッチン
+  bedroom:       寝室
+  western_room:  洋室
+  japanese_room: 和室
+  closet:        クローゼット・収納
+  washroom:      洗面所
+  bathroom:      浴室
+  toilet:        トイレ
+  balcony:       バルコニー
+  view:          眺望
+  other:         その他

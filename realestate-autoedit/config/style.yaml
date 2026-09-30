@@ -1,0 +1,132 @@
+# ============================================================
+#  スタイル設定(テロップ・トランジション・尺)
+#  座標はすべて 1080x1920(縦型 9:16)基準のピクセル値
+#  現状のTikTok動画(TOALU)の画面録画から採寸した値を初期値にしている
+# ============================================================
+
+canvas:
+  width: 1080
+  height: 1920
+  fps: 30
+
+duration:
+  min: 30.0          # 目標尺(秒)
+  max: 40.0
+
+# ---------- 素材の自動カット(安定区間の抽出) ----------
+analyze:
+  sample_hz: 10            # 解析のサンプリング頻度
+  min_segment: 1.8         # 使える区間の最短(秒)
+  max_speed: 0.70          # これより速いカメラ移動は「移動中」「振り回し」とみなして捨てる(画面幅/秒)
+  ideal_speed: 0.25        # 理想の速さ(ジンバルでゆっくり歩く程度)。これに近いほど高評価
+  ideal_speed_width: 0.20
+  max_shake: 0.035         # 手ブレ量の上限
+  min_sharpness_ratio: 0.30  # クリップ内中央値に対するシャープネス比の下限(ブレ・ピンボケ除外)
+  trim_edges: 0.2          # 区間の両端を少し削って、動き出し/止まりを避ける
+
+# ---------- 見せ方(ゆっくり・上品) ----------
+motion:
+  slow_speed: 0.8          # 60fps素材のときの再生速度(0.8 = 少しスロー)。30fps素材は1.0のまま
+  slow_min_fps: 50
+  push_in: [1.00, 1.04]    # 各カットでゆっくり寄る(Ken Burns)。開始倍率→終了倍率
+
+transitions:
+  same_room:   {type: dissolve,      duration: 0.45}   # 同じ部屋の中のカット間
+  room_change: {type: blur_dissolve, duration: 0.80}   # 部屋が変わるとき(一番上品に見せる所)
+  to_ad:       {type: fade_white,    duration: 0.50}
+  from_ad:     {type: fade_white,    duration: 0.50}
+  default:     {type: dissolve,      duration: 0.50}
+  ending_fade: 0.0          # 最後に黒へフェード(秒)。TikTokのループ再生を考えて初期値は0
+
+# ---------- フォント ----------
+# 候補を順に探す(ファイル名だけでよい)。探す場所: 物件動画/共通/フォント/ → assets/fonts/ → OSの書体フォルダ
+# 実際に使っている書体を 物件動画/共通/フォント/ に置き、その名前を各リストの先頭に書けば差し替わる
+# 確認: python -m autoedit.fonts 物件動画/共通/フォント
+fonts:
+  heavy_serif:   # 見所・キャッチ(極太明朝)
+    [NotoSerifCJK-Black.ttc, NotoSerifJP-Black.otf, NotoSerifCJKjp-Black.otf, NotoSerifJP-Black.ttf, "ヒラギノ明朝 ProN.ttc", yumindb.ttf]
+  serif_bold:    # 部屋紹介のサブコピー
+    [NotoSerifCJK-Bold.ttc, NotoSerifJP-Bold.otf, NotoSerifCJKjp-Bold.otf, NotoSerifJP-Bold.ttf, "ヒラギノ明朝 ProN.ttc", yumindb.ttf]
+  latin_serif:   # 部屋名(英字セリフ)
+    [NotoSerifCJK-Regular.ttc, NotoSerifJP-Regular.otf, NotoSerifCJKjp-Regular.otf, NotoSerifJP-Regular.ttf, "ヒラギノ明朝 ProN.ttc", yumin.ttf]
+  sans_bold:     # CTA・ルームツアーSTART
+    [NotoSansCJK-Bold.ttc, NotoSansJP-Bold.otf, NotoSansCJKjp-Bold.otf, NotoSansJP-Bold.ttf, "ヒラギノ角ゴシック W6.ttc", YuGothB.ttc]
+
+# ---------- テロップ ----------
+telops:
+  hook:            # 冒頭の見所「誰もが憧れる、この空間」
+    font: heavy_serif
+    size: 84
+    center_y: 450
+    max_width: 960
+    color: [255, 255, 255]
+    italic_skew: 0.12            # 斜体の傾き
+    shadow: {offset: [7, 7], blur: 3, color: [0, 0, 0], opacity: 0.85}
+    fade_in: 0.25
+    fade_out: 0.25
+
+  catch:           # キャッチ「阿波座駅3分の / デザイナーズマンション」+ 傍点
+    font: heavy_serif
+    size: 78
+    center_y: 470
+    line_spacing: 1.28
+    max_width: 1000
+    color: [255, 255, 255]
+    italic_skew: 0.12
+    shadow: {offset: [7, 7], blur: 3, color: [0, 0, 0], opacity: 0.85}
+    emphasis_dot: {radius: 12, gap_above: 14}   # 傍点(●)
+    fade_in: 0.3
+    fade_out: 0.3
+
+  start:           # 「ルームツアー START」横に流れる
+    font: sans_bold
+    size: 50
+    center_y: 960
+    letter_spacing: 34
+    color: [255, 255, 255]
+    italic_skew: 0.18
+    shadow: {offset: [3, 3], blur: 4, color: [0, 0, 0], opacity: 0.5}
+    move_from_x: 120             # 左方向へ流れる(開始オフセット→終了オフセット)
+    move_to_x: -320
+    fade_in: 0.2
+    fade_out: 0.6
+
+  room:            # 部屋紹介「Living / 暮らしの中心になる心地よい空間」
+    title_font: latin_serif
+    title_size: 88
+    sub_font: serif_bold
+    sub_size: 36
+    center_y: 330                # 英字タイトルの中心
+    sub_gap: 22
+    color: [255, 255, 255]
+    shadow: {offset: [3, 3], blur: 6, color: [0, 0, 0], opacity: 0.8}
+    fade_in: 0.7                 # ふわっと出す
+    rise: 14                     # 出るときに少し浮き上がる(px)
+    fade_out: 0.4
+    delay: 0.35                  # カット頭から少し遅らせて出す
+
+  cta:             # 「気になった方は詳細とコメント✓」+ 矢印
+    font: sans_bold
+    size: 50
+    center_y: 460
+    center_x: 540
+    italic_skew: 0.14
+    color: [255, 255, 255]
+    box: {pad_x: 28, pad_y: 14, border: 4, border_color: [255, 255, 255], fill: [0, 0, 0], fill_opacity: 0.35}
+    check_icon: true
+    fade_in: 0.4
+    # ---- 矢印:TikTokのアカウントアイコンを正確に指す ----
+    # target = アイコン中心の推定位置(1080x1920 動画座標)。画面録画から採寸:
+    #   アイコン中心 ≒ (953, 960) = 画面右端・縦のちょうど真ん中、半径 ≒ 54px
+    # 現状の動画は矢印が水平で先端が(878,897)付近 → アイコンより左上にズレていた
+    arrow:
+      target: [953, 960]
+      target_radius: 54
+      gap: 14                    # アイコンの縁から矢印の先端までの隙間
+      length: 190
+      angle_deg: 18              # 水平から下向きの角度(左上から右下へアイコンを指す)
+      thickness: 14
+      head: 46
+      color: [255, 255, 255]
+      shadow_opacity: 0.45
+      nudge: {amplitude: 12, period: 0.9}   # 先端方向にツンツン動かして目線を誘導

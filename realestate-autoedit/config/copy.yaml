@@ -1,0 +1,24 @@
+# ============================================================
+#  部屋紹介テロップの文言辞書
+#  現状の動画で使っている表記(英字小文字混じり + 明朝のサブコピー)に合わせている
+#  title: 英字の部屋名 / sub: サブコピー
+# ============================================================
+
+rooms:
+  living:        {title: "Living",       sub: "暮らしの中心になる心地よい空間"}
+  dining:        {title: "Dining",       sub: "会話が弾むくつろぎのひととき"}
+  kitchen:       {title: "Kitchen",      sub: "料理が楽しくなる洗練された空間"}
+  bedroom:       {title: "Bedroom",      sub: "一日の疲れを癒す上質な寝室"}
+  western_room:  {title: "Room",         sub: "ライフスタイルに合わせて使える空間"}
+  japanese_room: {title: "Japanese room", sub: "心落ち着く和の空間"}
+  closet:        {title: "Closet",       sub: "たっぷり収納で片付く暮らし"}
+  washroom:      {title: "Powder room",  sub: "朝の支度がはかどる洗面空間"}
+  bathroom:      {title: "bath room",    sub: "心身を癒すリラックス空間"}
+  toilet:        {title: "toilet",       sub: "気持ちよく使える清潔空間"}
+  balcony:       {title: "Balcony",      sub: "開放感あふれる眺望"}
+
+cta:
+  text: "気になった方は詳細とコメント"
+
+start:
+  text: "ルームツアー START"

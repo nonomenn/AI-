@@ -1,0 +1,33 @@
+# ============================================================
+#  物件フォルダの構成(素材の受け渡し方法)
+#
+#  物件動画/
+#    共通/                 全物件で共通の素材
+#      広告.png            TOALU ESTATE の広告画像(1080x1920)
+#      BGM/                音源(複数あれば property.yaml の bgm で選ぶ。未指定は名前順で先頭)
+#      フォント/            実際に使っている書体ファイル
+#    阿波座○○/             1物件 = 1フォルダ(LINEで届いた物件名)
+#      素材/               撮影者から届いた動画(部屋ごとのクリップ)
+#      物件資料.pdf 等       物件詳細資料(PDF・画像、間取り図入り)をそのまま直下に置く
+#      property.yaml       ← intake が自動生成(文言を直したいときはここを編集)
+#      floorplan.json      ← intake が自動生成(間取り図の読み取り結果)
+#      出力/               ← 書き出し先(物件名.mp4 と 物件名_plan.json)
+# ============================================================
+
+materials_dir: 素材
+output_dir: 出力
+property_file: property.yaml
+floorplan_file: floorplan.json
+facts_file: 物件情報.json      # intake が読み取った物件情報(確認用)
+common_dir: ../共通           # 物件フォルダからの相対パス
+
+common:
+  ad: [広告, ad]               # 共通/ 直下のこの名前の画像(拡張子は問わない)
+  bgm_dir: [BGM, bgm]
+  font_dir: [フォント, fonts]
+
+# 物件資料として読むファイル(物件フォルダ直下)
+doc_ext: [.pdf, .jpg, .jpeg, .png, .webp]
+video_ext: [.mp4, .mov, .m4v]
+audio_ext: [.mp3, .m4a, .aac, .wav]
+image_ext: [.png, .jpg, .jpeg, .webp]

@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+out/
+物件動画/
+*.video.mp4

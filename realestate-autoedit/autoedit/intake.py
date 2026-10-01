@@ -50,6 +50,12 @@ FACTS_SCHEMA = {
         "conditions": {"type": "array", "items": {"type": "string"}},
         "hook_candidates": {"type": "array", "items": {"type": "string"}},
         "catch_candidates": {"type": "array", "items": {"type": "string"}},
+        "highlights": {"type": "array", "items": {
+            "type": "object",
+            "properties": {"key": {"type": "string"}, "title": {"type": "string"}, "sub": {"type": "string"},
+                           "near": {"type": "string"}, "words": {"type": "array", "items": {"type": "string"}},
+                           "rare": {"type": "boolean"}},
+            "required": ["key", "title", "sub", "near", "words", "rare"], "additionalProperties": False}},
         "thumb_title": {"type": "string"},
         "thumb_sub": {"type": "string"},
         "thumb_bar": {"type": "array", "items": {"type": "string"}},
@@ -58,7 +64,7 @@ FACTS_SCHEMA = {
         "caption_body": {"type": "string"},
     },
     "required": ["property_name", "building_type", "station", "line", "walk_minutes", "layout", "area_m2",
-                 "features", "floorplan", "built", "conditions", "hook_candidates", "catch_candidates",
+                 "features", "floorplan", "built", "conditions", "highlights", "hook_candidates", "catch_candidates",
                  "thumb_title", "thumb_sub", "thumb_bar", "post_title", "caption_heading", "caption_body"],
     "additionalProperties": False,
 }
@@ -76,6 +82,17 @@ TikTok用ルームツアー動画(高級賃貸・TOALU ESTATE)のために、次
 
 2. floorplan: 間取り図の読み取り。source には間取り図が載っていたファイル名(PDFならファイル名とページ)。
 {floorplan_rules}
+
+2b. highlights: この物件ならではの見どころを、魅力の大きい順に最大6つ(資料に書かれているものだけ)。
+ 動画では基本の部屋(リビング・キッチン等)とは別に、これを映像から探して必ず見せる。
+ - key: 次の決まった名前から選ぶ。合うものが無ければ英小文字とアンダースコアで新しく作る
+   garage, shoe_closet(土間収納), pantry, laundry, walk_in_closet, sauna, terrace, roof_balcony, private_garden,
+   marble(大理石の天板など), island_kitchen, atrium(吹き抜け), view(眺望)
+ - title: 部屋紹介テロップの英字(例: Garage, Pantry)。sub: 明朝のサブコピー(全角16文字以内、上品に)
+ - near: いちばん近い部屋の種類(genkan, living, kitchen, bedroom, washroom, bathroom, balcony など)
+ - words: 冒頭テロップ等でこの見どころを指す言葉(例: ["ガレージ"])
+ - rare: 賃貸ではなかなかない特徴なら true(サウナ、屋外テラス、ルーフバルコニー、専用庭、大理石、ガレージ、吹き抜け、
+   アイランドキッチン、眺望など)。土間収納・パントリー・WIC・ランドリーなど比較的よくあるものは false
 
 3〜4. 冒頭(0〜9秒)のコピー。目的は「この物件は何が特別か」を1つだけ伝えて、続きを見たくさせること。
  まず訴求ポイントを1つ決める。選ぶ順:
@@ -212,6 +229,12 @@ def property_yaml(hook: str, catch: str, facts: dict | None, others: list[str], 
     if others:
         out.append("# ほかの案:")
         out += [f"#   {o.replace(chr(10), ' / ')}" for o in others]
+    if facts and facts.get("highlights"):
+        out += ["", "# この物件ならではの見どころ(上ほど優先)。映像の中から探して、部屋紹介でゆったり見せる",
+                "highlights:"]
+        for h in facts["highlights"]:
+            out.append("  - " + json.dumps({k: h[k] for k in ("key", "title", "sub", "near", "words", "rare") if k in h},
+                                            ensure_ascii=False))
     if facts:
         bar = [b.strip() for b in facts.get("thumb_bar", [])][:3]
         out += ["", "# サムネイル(《》で囲んだ部分がゴールド)",

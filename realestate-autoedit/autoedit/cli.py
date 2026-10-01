@@ -63,6 +63,34 @@ def _collect_clips(path: str) -> list[str]:
     return [path]
 
 
+def load_highlights(props: dict, copy: dict) -> list[dict]:
+    """property.yaml の highlights(この物件ならではの見どころ)を読み、部屋紹介テロップの文言にも登録する。
+    書き方: - {key: pantry, title: "Pantry", sub: "キッチン横の大容量パントリー", near: kitchen, words: [パントリー]}
+    title/sub を省略すると config/copy.yaml の features の文言を使う。"""
+    out = []
+    defaults = copy.get("features", {})
+    for h in props.get("highlights") or []:
+        h = {"key": h} if isinstance(h, str) else dict(h)
+        d = defaults.get(h["key"], {})
+        for k in ("title", "sub", "near", "words", "rare"):
+            if k not in h and k in d:
+                h[k] = d[k]
+        h.setdefault("title", h["key"])
+        h.setdefault("words", [])
+        props.setdefault("rooms", {}).setdefault(h["key"], {"title": h["title"], "sub": h.get("sub", "")})
+        out.append(h)
+    return out
+
+
+def claim_warnings(props: dict, highlights: list[dict], segs) -> list[str]:
+    """冒頭テロップ・キャッチ・サムネで言っている見どころが、映像に映っているか。"""
+    said = " ".join(str(x) for x in [props.get("hook", ""), props.get("catch", ""),
+                                     (props.get("thumbnail") or {}).get("title", "")])
+    have = {s.feature for s in segs if s.feature and not s.is_transit}
+    return [f"「{w}」と言っていますが、{h['title']} の映像がありません(撮影を依頼するか、文言を変える)"
+            for h in highlights for w in h.get("words", [])[:1] if w in said and h["key"] not in have]
+
+
 def build_parser():
     ap = argparse.ArgumentParser(prog="python -m autoedit", description="不動産ルームツアー動画 自動編集")
     ap.add_argument("project", nargs="?", help="物件フォルダ(物件動画/物件名)。指定すると下の個別指定は省略できる")
@@ -171,8 +199,9 @@ def run(args):
 
     print("[3/5] 各カットの部屋判定・映え度")
     room_types = list(tpl["room_types"].keys())
+    highlights = load_highlights(props, copy)
     if use_ai:
-        vision.classify_segments(segs, room_types, floorplan)
+        vision.classify_segments(segs, room_types, floorplan, highlights=highlights)
     else:
         vision.label_from_filename(segs)
         print("  AIを使わないため、ファイル名/手動ラベルで判定")
@@ -185,7 +214,9 @@ def run(args):
     print("[4/5] 構成の組み立て")
     from .analyze import attach_signatures
     attach_signatures(segs)   # 同じ構図のカットを2回使わないための指紋
-    plan = build_plan(segs, cfg, tpl, ad)
+    plan = build_plan(segs, cfg, tpl, ad, highlights=highlights, hook_text=str(props.get("hook", "")))
+    for w in claim_warnings(props, highlights, segs):
+        print(f"  ⚠ {w}")
     starts, total = timeline(plan)
     for st, p in zip(starts, plan):
         tr = p.transition_in

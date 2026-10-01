@@ -22,3 +22,21 @@ cta:
 
 start:
   text: "ルームツアー START"
+
+# この物件ならではの見どころ(property.yaml の highlights の key)の文言の初期値。
+# near = 近くの部屋(区画の判定と、並べる順番の目安)、words = 冒頭テロップ等でこの見どころを指す言葉
+# rare = 賃貸ではなかなかない特徴。尺が長くなっても落とさず、必ず見せる
+features:
+  garage:         {title: "Garage",          sub: "愛車を守るビルトインガレージ",       near: genkan,        words: [ガレージ], rare: true}
+  shoe_closet:    {title: "Shoe closet",     sub: "玄関まわりを美しく整える収納空間",   near: genkan,        words: [土間収納, シューズ]}
+  pantry:         {title: "Pantry",          sub: "キッチン横の大容量パントリー",       near: kitchen,       words: [パントリー]}
+  laundry:        {title: "Laundry room",    sub: "家事がはかどるランドリールーム",     near: washroom,      words: [ランドリー]}
+  walk_in_closet: {title: "Walk-in closet",  sub: "衣類をまとめて収める大容量収納",     near: bedroom,       words: [ウォークイン, WIC]}
+  sauna:          {title: "Sauna",           sub: "自宅で整うプライベートサウナ",       near: bathroom,      words: [サウナ], rare: true}
+  terrace:        {title: "Terrace",         sub: "空を感じる開放的な屋外テラス",       near: balcony,       words: [テラス], rare: true}
+  roof_balcony:   {title: "Roof balcony",    sub: "眺望を独り占めするルーフバルコニー", near: balcony,       words: [ルーフバルコニー], rare: true}
+  private_garden: {title: "Garden",          sub: "緑を楽しむ専用庭",                   near: living,        words: [専用庭, 庭], rare: true}
+  marble:         {title: "Marble",          sub: "上質な大理石の天板",                 near: kitchen,       words: [大理石], rare: true}
+  island_kitchen: {title: "Island kitchen",  sub: "会話が弾むアイランドキッチン",       near: kitchen,       words: [アイランド], rare: true}
+  atrium:         {title: "Atrium",          sub: "光が降り注ぐ吹き抜け",               near: living,        words: [吹き抜け], rare: true}
+  view:           {title: "View",            sub: "日常を彩る眺望",                     near: balcony,       words: [眺望, 一望], rare: true}

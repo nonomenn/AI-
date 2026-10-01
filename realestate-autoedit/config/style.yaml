@@ -48,6 +48,7 @@ transitions:
   zone_change:     {type: blur_dissolve, duration: 1.0}   # (1) 区画が変わるとき(LDK→水回り、水回り→個室 など。template.yaml の zones)
   tour_start:      {type: blur_dissolve, duration: 1.0}   # (1) START → 最初の部屋(ルームツアーの始まり)
   to_cta:          {type: light_leak,    duration: 1.2}   # (3) 最後の見せ場(眺望・バルコニー)へ。1本に1回だけ
+  to_bridge:       {type: dissolve,      duration: 0.7}   # (2) 部屋 → 廊下・階段のつなぎ。つなぎから次の部屋へは歩きの流れのままカット
   to_ad:           {type: dissolve,      duration: 0.5}   # (2) 広告の前後
   from_ad:         {type: dissolve,      duration: 0.5}
   motion_tolerance: 0.06    # 横の動きがこれより小さいカットは「ほぼ止まっている」とみなし、どの向きともカットでつなげる

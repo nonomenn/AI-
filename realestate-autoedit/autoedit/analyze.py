@@ -30,6 +30,8 @@ class Segment:
     room: str = "other"          # AIが判定した部屋の種類
     beauty: float = 5.0           # AIが判定した「映え度」(0〜10)
     is_transit: bool = False      # 移動中のカットか(AI判定)
+    feature: str = ""             # この物件ならではの見どころ(property.yaml の highlights の key)が映っていれば、その key
+    bridge: bool = False          # 廊下・階段をゆっくり進む、場面のつなぎに使える落ち着いたカットか
     note: str = ""
     id: str = ""
 

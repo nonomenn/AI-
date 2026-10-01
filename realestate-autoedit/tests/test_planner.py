@@ -128,3 +128,35 @@ def test_no_duplicate_composition(cfg, tpl):
     plan = build_plan(pool, cfg, tpl, None, log=lambda *_: None)
     ids = [p.seg.id for p in plan if p.seg and p.room == "living"]
     assert a.id in ids and b.id not in ids and c.id in ids
+
+
+def _walk_seg(i, room, t, beauty=6, feature="", bridge=False, clip="/x/walk.mov"):
+    s = Segment(clip=clip, start=t, end=t + 5.0, fps=60.0, width=1080, height=1920, score=0.85,
+                room=room, beauty=beauty, id=f"w#{i}")
+    s.feature, s.bridge = feature, bridge
+    return s
+
+
+def test_highlights_bridges_and_opening(cfg, tpl):
+    """見どころは部屋紹介に入り(珍しいものは落とさない)、区画が変わるところに廊下のつなぎ、冒頭は一番映えるカット。"""
+    hl = [{"key": "sauna", "title": "Sauna", "near": "bathroom", "rare": True, "words": ["サウナ"]},
+          {"key": "pantry", "title": "Pantry", "near": "kitchen", "rare": False, "words": []}]
+    pool = [_walk_seg(0, "genkan", 0), _walk_seg(1, "corridor", 6),
+            _walk_seg(2, "washroom", 12), _walk_seg(3, "bathroom", 18, feature="sauna", beauty=8),
+            _walk_seg(4, "bathroom", 24), _walk_seg(5, "corridor", 30, bridge=True),
+            _walk_seg(6, "living", 36, beauty=9), _walk_seg(7, "kitchen", 42, beauty=8),
+            _walk_seg(8, "closet", 48, feature="pantry"), _walk_seg(9, "western_room", 54),
+            seg(10, "balcony", beauty=7), seg(11, "exterior", beauty=6), seg(12, "living", beauty=10)]
+    plan = build_plan(pool, cfg, tpl, "ad.png", log=lambda *_: None, highlights=hl, hook_text="サウナ付きの新築")
+    secs = [(p.section, p.room) for p in plan]
+    assert secs[0] == ("hook", "bathroom") and plan[0].seg.feature == "sauna"  # 冒頭テロップが言う見どころを最初に
+    catch = [p for p in plan if p.section == "catch"]
+    assert catch[0].seg.beauty >= 9                       # キャッチは一番映えるカット
+    tour = [(p.section, p.room) for p in plan if p.section in ("rooms", "bridge")]
+    rooms = [r for s, r in tour if s == "rooms"]
+    assert any(p.seg and p.seg.feature == "sauna" for p in plan)   # 珍しい見どころ(サウナ)は必ず映る
+    assert ("bridge", "corridor") in tour                  # 水回り → LDK の区画の変わり目に廊下
+    i = tour.index(("bridge", "corridor"))
+    assert tour[i - 1][1] in ("washroom", "bathroom") and tour[i + 1][1] in ("living", "kitchen")
+    _, total = timeline(plan)
+    assert total <= cfg["duration"]["max"] + 0.01

@@ -19,6 +19,9 @@ class Shot:
     image: str | None = None     # 静止画(広告)
     transition_in: dict = field(default_factory=dict)
     interp: str = ""             # 30fps素材をスローにするときの中間コマの作り方(blend / flow)
+    feature: bool = False        # この物件ならではの見どころのカット
+    feature_rare: bool = False   # 珍しい見どころ(サウナ・テラス・大理石など)。尺が長くても落とさない
+    feature_rank: int = 0        # 見どころの優先順位(property.yaml の highlights の順。0が最優先)
 
     def describe(self):
         if self.image:
@@ -65,9 +68,31 @@ def _take(seg: Segment, want: float, cfg, section: str, room: str = "", telop=No
                 speed=speed, room=room or seg.room, telop=telop, interp=interp if interp != "none" else "")
 
 
-def build_plan(segs: list[Segment], cfg: dict, tpl: dict, ad_image: str | None, log=print) -> list[Shot]:
+def _appeal(s: Segment, highlights: list[dict]) -> float:
+    """映え度 + この物件ならではの見どころのボーナス(上位の見どころほど大きい)。冒頭に置くカットを選ぶ基準。"""
+    keys = [h["key"] for h in highlights]
+    bonus = 0.0
+    if s.feature in keys:
+        bonus = 3.0 - 0.4 * keys.index(s.feature)
+    return s.beauty + max(0.0, bonus) + 0.5 * s.score
+
+
+def _walk_clip(pool: list[Segment]) -> str | None:
+    """家の中を歩いて撮った長回し(部屋の種類が一番多いクリップ)。部屋を回る順番の手がかりにする。"""
+    by_clip: dict[str, set] = {}
+    for s in pool:
+        by_clip.setdefault(s.clip, set()).add(s.feature or s.room)
+    best = max(by_clip.items(), key=lambda kv: len(kv[1]), default=(None, set()))
+    return best[0] if len(best[1]) >= 3 else None
+
+
+def build_plan(segs: list[Segment], cfg: dict, tpl: dict, ad_image: str | None, log=print,
+               highlights: list[dict] | None = None, hook_text: str = "") -> list[Shot]:
     cfg["_zones"] = tpl.get("zones", {})
-    pool = [s for s in segs if _usable(s)]
+    highlights = highlights if highlights is not None else cfg.get("_highlights", [])
+    cfg["_feature_zone"] = {h["key"]: h.get("near", "") for h in highlights}
+    pool = [s for s in segs if _usable(s) and not s.bridge]
+    bridges_pool = [s for s in segs if s.bridge]
     used: set[str] = set()
     dup_thr = cfg["analyze"].get("duplicate_inliers", 25)
     chosen: list[Segment] = []          # 実際に使ったカット(同じ構図の2回使いを避けるため)
@@ -90,7 +115,7 @@ def build_plan(segs: list[Segment], cfg: dict, tpl: dict, ad_image: str | None, 
     # 部屋紹介で使うべきカットは、掴み/キャッチに取られないよう先に確保しておく(各部屋のベスト1カット)
     reserved = {}
     for room in room_order:
-        rs = [s for s in pool if s.room == room]
+        rs = [s for s in pool if s.room == room and not s.feature]
         if rs:
             reserved[room] = max(rs, key=lambda s: (s.beauty, s.score)).id
 
@@ -122,7 +147,14 @@ def build_plan(segs: list[Segment], cfg: dict, tpl: dict, ad_image: str | None, 
     for sec in tpl["sections"]:
         sid = sec["id"]
         if sid == "hook":
-            s = pick_non_reserved(sec["prefer"], sec.get("by_beauty", True), sec.get("avoid", ()))
+            s = None
+            # 冒頭テロップが言っている見どころ(例: ガレージ)が映っているカットがあれば、それを最初に見せる
+            said = [h["key"] for h in highlights if any(w and w in hook_text for w in h.get("words", []))]
+            cands = [x for x in pool if x.feature in said and x.id not in used and not is_dup(x)]
+            if cands:
+                s = max(cands, key=lambda x: _appeal(x, highlights))
+            if not s:
+                s = pick_non_reserved(sec["prefer"], sec.get("by_beauty", True), sec.get("avoid", ()))
             if s:
                 used.add(s.id)
                 chosen.append(s)
@@ -133,15 +165,21 @@ def build_plan(segs: list[Segment], cfg: dict, tpl: dict, ad_image: str | None, 
             taken_rooms: list[str] = []
             for _ in range(sec["shots"]):
                 avoid = tuple(sec.get("avoid", ())) + (tuple(taken_rooms) if sec.get("distinct_rooms") else ())
-                s = pick_non_reserved(sec["prefer"], sec.get("by_beauty", True),
-                                      avoid + tuple(sec.get("avoid_if_possible", ())))
-                if not s:
-                    s = pick_non_reserved(sec["prefer"], sec.get("by_beauty", True), avoid)
+                if sec.get("by_appeal"):
+                    # 冒頭の数秒は、物件で一番映えるカットを見せて引きを強くする(見どころを優先)
+                    cands = [x for x in pool if x.id not in used and not is_dup(x)
+                             and (x.feature or x.room) not in avoid and x.room not in sec.get("avoid", ())]
+                    s = max(cands, key=lambda x: _appeal(x, highlights)) if cands else None
+                else:
+                    s = pick_non_reserved(sec["prefer"], sec.get("by_beauty", True),
+                                          avoid + tuple(sec.get("avoid_if_possible", ())))
+                    if not s:
+                        s = pick_non_reserved(sec["prefer"], sec.get("by_beauty", True), avoid)
                 if not s:
                     break
                 used.add(s.id)
                 chosen.append(s)
-                taken_rooms.append(s.room)
+                taken_rooms.append(s.feature or s.room)
                 sh = _take(s, per, cfg, "catch", telop="catch" if first else None)
                 plan.append(sh)
                 first = False
@@ -156,24 +194,7 @@ def build_plan(segs: list[Segment], cfg: dict, tpl: dict, ad_image: str | None, 
             if start_seg:
                 plan.append(_take(start_seg, sec["duration"], cfg, "start", telop="start"))
         elif sid == "rooms":
-            lo, hi = sec["per_shot"]
-            for room in room_order:
-                n_max = (sec.get("shots_per_room") or {}).get(room, sec["max_shots_per_room"])
-                rs = []
-                for s in sorted([s for s in pool if s.room == room and s.id not in used],
-                                key=lambda s: (s.beauty, s.score), reverse=True):
-                    if len(rs) >= n_max:
-                        break
-                    if is_dup(s) or any(similarity(s, r) >= dup_thr for r in rs):
-                        continue   # すでに使ったカットと同じ構図 → 使わない
-                    rs.append(s)
-                # 同じ部屋の中では撮影順に並べる(動きの流れが自然になる)
-                rs.sort(key=lambda s: (s.clip, s.start))
-                for k, s in enumerate(rs):
-                    used.add(s.id)
-                    chosen.append(s)
-                    plan.append(_take(s, _room_shot_len(s, lo, hi), cfg, "rooms", room=room,
-                                      telop="room" if k == 0 else None))
+            plan.extend(_tour(sec, pool, bridges_pool, used, chosen, is_dup, dup_thr, highlights, cfg, tpl, log))
         elif sid == "cta":
             if cta_seg:
                 plan.append(_take(cta_seg, sec["duration"], cfg, "cta", telop="cta"))
@@ -181,6 +202,92 @@ def build_plan(segs: list[Segment], cfg: dict, tpl: dict, ad_image: str | None, 
     _fit_duration(plan, cfg, tpl, log)
     _assign_transitions(plan, cfg)
     return plan
+
+
+def _tour(sec, pool, bridges_pool, used, chosen, is_dup, dup_thr, highlights, cfg, tpl, log) -> list[Shot]:
+    """部屋紹介(ルームツアー)。基本の部屋 + この物件ならではの見どころ(highlights)を、
+    歩いて回る順(1F→2F→3F)に並べ、区画が大きく変わるところに廊下・階段のつなぎを入れる。"""
+    lo, hi = sec["per_shot"]
+    room_order = sec["order"]
+    zones = tpl.get("zones", {})
+    hl = {h["key"]: h for h in highlights}
+
+    def take_best(cands, n):
+        rs = []
+        for s in sorted(cands, key=lambda s: (s.beauty, s.score), reverse=True):
+            if len(rs) >= n:
+                break
+            if s.id in used or is_dup(s) or any(similarity(s, r) >= dup_thr for r in rs):
+                continue   # すでに使ったカットと同じ構図 → 使わない
+            rs.append(s)
+        return rs
+
+    stops = []   # (key, 見どころか, [カット])
+    for room in room_order:
+        n_max = (sec.get("shots_per_room") or {}).get(room, sec["max_shots_per_room"])
+        rs = take_best([s for s in pool if s.room == room and not s.feature], n_max)
+        if rs:
+            stops.append((room, False, rs))
+    for h in highlights:
+        if h.get("in_tour", True) is False:
+            continue
+        rs = take_best([s for s in pool if s.feature == h["key"]], 1)
+        if rs:
+            stops.append((h["key"], True, rs))
+        elif not any(s.feature == h["key"] for s in chosen):
+            log(f"  ⚠ 見どころ「{h.get('title', h['key'])}」の映像が見つかりません(撮影されていない可能性)")
+    for _, _, rs in stops:
+        for s in rs:
+            used.add(s.id)
+            chosen.append(s)
+
+    # 並べる順番: 長回し(家の中を歩いた映像)があれば、その中で出てくる順 = 実際に歩いて回る順
+    walk = _walk_clip(pool + bridges_pool) if sec.get("tour_order", "walk") == "walk" else None
+
+    def pos(stop):
+        key, is_feat, rs = stop
+        t = [s.start for s in rs if s.clip == walk]
+        if not t and walk:
+            t = [s.start for s in pool if s.clip == walk and (s.feature == key if is_feat else s.room == key)]
+        if t:
+            return min(t)
+        base = hl[key].get("near", "") if is_feat else key
+        idx = room_order.index(base) if base in room_order else len(room_order)
+        return 1e6 + idx + (0.5 if is_feat else 0)
+
+    stops.sort(key=pos)
+
+    def zone_of(key, is_feat):
+        k = hl[key].get("near", key) if is_feat else key
+        return next((z for z, rooms in zones.items() if k in rooms), k)
+
+    out: list[Shot] = []
+    br = sec.get("bridges", {})
+    n_bridges = 0
+    prev = None
+    for stop in stops:
+        key, is_feat, rs = stop
+        if (prev and walk and n_bridges < br.get("max", 0)
+                and zone_of(prev[0], prev[1]) != zone_of(key, is_feat)):
+            # 区画が変わる → その間を歩いた廊下・階段のカットがあれば、ゆったりつなぐ
+            a, b = pos(prev), pos(stop)
+            cands = [s for s in bridges_pool if s.clip == walk and a < s.start < b and s.id not in used]
+            if cands:
+                bs = max(cands, key=lambda s: (s.score, -s.speed))
+                used.add(bs.id)
+                out.append(_take(bs, br.get("duration", 3.0), cfg, "bridge", room=bs.room))
+                n_bridges += 1
+        rs = sorted(rs, key=lambda s: (s.clip, s.start))   # 同じ部屋の中では撮影順(動きの流れが自然)
+        for k, s in enumerate(rs):
+            dur = hi if is_feat else _room_shot_len(s, lo, hi)   # 見どころはゆったり長く
+            sh = _take(s, dur, cfg, "rooms", room=key, telop="room" if k == 0 else None)
+            sh.feature = is_feat
+            if is_feat:
+                sh.feature_rare = bool(hl[key].get("rare"))
+                sh.feature_rank = [h["key"] for h in highlights].index(key)
+            out.append(sh)
+        prev = stop
+    return out
 
 
 def _total(plan, cfg):
@@ -206,9 +313,19 @@ def _fit_duration(plan: list[Shot], cfg, tpl, log):
 
     for item in drop_order:
         while too_long():
-            if item == "second_cuts":
+            if item == "common_features":
+                cf = [p for p in plan if p.section == "rooms" and p.feature and not p.feature_rare]
+                if not cf:
+                    break
+                plan.remove(max(cf, key=lambda p: p.feature_rank))
+            elif item == "bridges":
+                br = [p for p in plan if p.section == "bridge"]
+                if not br:
+                    break
+                plan.remove(br[-1])
+            elif item == "second_cuts":
                 # 2カット以上ある部屋から、映え度の低い方を落とす(残った方に部屋名テロップを付け直す)
-                shots = [p for p in plan if p.section == "rooms"]
+                shots = [p for p in plan if p.section == "rooms" and not p.feature]
                 multi = {r for r in {p.room for p in shots} if sum(q.room == r for q in shots) >= 2}
                 extras = [p for p in shots if p.room in multi]
                 if not extras:
@@ -219,10 +336,10 @@ def _fit_duration(plan: list[Shot], cfg, tpl, log):
                 if had_telop:
                     next(p for p in plan if p.section == "rooms" and p.room == worst.room).telop = had_telop
             else:
-                present = {p.room for p in plan if p.section == "rooms"}
+                present = {p.room for p in plan if p.section == "rooms" and not p.feature}
                 if item not in present or len(present) <= rooms_sec.get("min_rooms", 3):
                     break
-                plan[:] = [p for p in plan if not (p.section == "rooms" and p.room == item)]
+                plan[:] = [p for p in plan if not (p.section == "rooms" and p.room == item and not p.feature)]
             _assign_transitions(plan, cfg)
     # 2) それでも長ければ部屋カットを均等に短縮
     while _total(plan, cfg) > hi:
@@ -244,7 +361,8 @@ def _motion_ok(a: Shot, b: Shot, tol: float) -> bool:
     return abs(ax) < tol or abs(bx) < tol or (ax > 0) == (bx > 0)
 
 
-def _zone(room: str, zones: dict) -> str:
+def _zone(room: str, zones: dict, feature_near: dict | None = None) -> str:
+    room = (feature_near or {}).get(room) or room   # 見どころは、近くの部屋(near)の区画に属する
     return next((z for z, rooms in zones.items() if room in rooms), room)
 
 
@@ -253,6 +371,7 @@ def _assign_transitions(plan: list[Shot], cfg, zones: dict | None = None):
     tr = cfg["transitions"]
     zones = zones if zones is not None else cfg.get("_zones", {})
     tol = tr.get("motion_tolerance", 0.06)
+    near = cfg.get("_feature_zone", {})
     for i, p in enumerate(plan):
         if i == 0:
             p.transition_in = {}
@@ -264,10 +383,14 @@ def _assign_transitions(plan: list[Shot], cfg, zones: dict | None = None):
             t = tr["from_ad"]
         elif p.section == "cta":
             t = tr["to_cta"]
-        elif prev.section == "start" and p.section == "rooms":
+        elif prev.section == "start" and p.section in ("rooms", "bridge"):
             t = tr["tour_start"]
+        elif p.section == "bridge":
+            t = tr.get("to_bridge", tr["motion_mismatch"])   # 部屋 → 廊下・階段: やわらかく
+        elif prev.section == "bridge" and _motion_ok(prev, p, tol):
+            t = tr["base"]                                    # 廊下を進んだ先の部屋へ: 歩きの流れのままカット
         elif (p.section == "rooms" and prev.section == "rooms"
-              and _zone(p.room, zones) != _zone(prev.room, zones)):
+              and _zone(p.room, zones, near) != _zone(prev.room, zones, near)):
             t = tr["zone_change"]
         elif _motion_ok(prev, p, tol):
             t = tr["base"]

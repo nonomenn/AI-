@@ -18,7 +18,7 @@ sections:
     duration: 6.4
     prefer: [entrance_hall, exterior, genkan, view, living, dining]
     distinct_rooms: true   # 2カットは別の場所から(同じ部屋の続きを2回見せない)
-    avoid_if_possible: [living]   # 主役の部屋は部屋紹介でじっくり見せるので、ほかに候補があればキャッチでは使わない
+    by_appeal: true        # 物件で一番映えるカット(見どころ優先)を冒頭に持ってきて、引きを強くする
     by_beauty: true
     avoid: [bathroom, toilet, washroom, closet]   # 水回りはキャッチに使わない
 
@@ -37,11 +37,16 @@ sections:
     per_shot: [3.6, 5.2]   # 1カットの尺の範囲(秒)。映え度が高いカットほど長く見せる
     max_shots_per_room: 1
     shots_per_room: {living: 2}          # 主役の部屋だけ2カット
-    # 尺が長い(またはカットが多い)とき、先に落とすもの。second_cuts = 同じ部屋の2カット目
+    tour_order: walk       # walk = 家の中を歩いた長回しに出てくる順(1F→2F→3F)/ template = 上の order の順
+    # 区画が大きく変わるところに、廊下・階段をゆったり進むカットをはさむ(長回しの中の、その間を歩いた部分から選ぶ)
+    bridges: {max: 2, duration: 3.2}
+    # この物件ならではの見どころ(property.yaml の highlights)は、ここに書いた部屋より後まで落とさない
+    # 尺が長い(またはカットが多い)とき、先に落とすもの。second_cuts = 同じ部屋の2カット目、bridges = 廊下のつなぎ
     # 水回り(洗面・浴室)は物件の見どころなので後ろに。ダイニングはLDKのカットに映ることが多いので先に
-    drop_order: [toilet, closet, second_cuts, japanese_room, dining, washroom, western_room]
+    # common_features = 珍しくない見どころ(土間収納・パントリー等。優先度の低い順に1つずつ)。珍しい見どころ(rare)は落とさない
+    drop_order: [toilet, closet, second_cuts, japanese_room, dining, washroom, common_features, bridges, western_room]
     min_rooms: 4
-    max_room_shots: 6      # 部屋紹介のカット数の上限。多いと忙しく見えるので、減らして1カットを長く見せる
+    max_room_shots: 6      # 部屋紹介のカット数の上限(見どころ込み、廊下のつなぎは除く)。多いと忙しく見えるので、減らして1カットを長く見せる
     order: [living, dining, kitchen, bedroom, western_room, japanese_room, closet, washroom, bathroom, toilet]
 
   - id: cta               # 映える映像 + コメント誘導
@@ -58,7 +63,7 @@ zones:
   private: [bedroom, western_room, japanese_room, closet]
   water:   [washroom, bathroom, toilet]
   outside: [exterior, entrance_hall, balcony, view]
-  entry:   [genkan, corridor]
+  entry:   [genkan, corridor, stairs]
 
 # 部屋の種類(AIの判定ラベル)
 room_types:
@@ -66,6 +71,7 @@ room_types:
   entrance_hall: エントランス・共用部
   genkan:        玄関
   corridor:      廊下
+  stairs:        階段
   living:        リビング
   dining:        ダイニング
   kitchen:       キッチン

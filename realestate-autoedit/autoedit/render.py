@@ -242,7 +242,7 @@ def render(plan: list[Shot], cfg: dict, fonts: dict, props: dict, copy: dict, ou
     tmp_video = out_path if not bgm else out_path + ".video.mp4"
     enc = subprocess.Popen(
         ["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "bgr24", "-s", f"{W}x{H}", "-r", str(fps),
-         "-i", "-", "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p",
+         "-i", "-", "-c:v", "libx264", "-preset", cfg["canvas"].get("preset", "slow"), "-crf", str(cfg["canvas"].get("crf", 20)), "-pix_fmt", "yuv420p",
          "-movflags", "+faststart", tmp_video], stdin=subprocess.PIPE)
 
     def shot_frame(i, t):

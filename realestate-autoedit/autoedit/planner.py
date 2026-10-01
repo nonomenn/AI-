@@ -1,4 +1,4 @@
-"""構成の組み立て: 判定済みのカットをテンプレート(見所→広告→部屋紹介→映え+CTA)に当てはめ、30〜40秒に収める。"""
+"""構成の組み立て: 判定済みのカットをテンプレート(見所→広告→部屋紹介→映え+CTA)に当てはめ、30〜45秒に収める。"""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -297,7 +297,7 @@ def _total(plan, cfg):
 
 
 def _fit_duration(plan: list[Shot], cfg, tpl, log):
-    """合計尺を 30〜40秒 に合わせる。長ければ template.yaml の drop_order の順(トイレ → 収納 → 同じ部屋の2カット目
+    """合計尺を 30〜45秒 に合わせる。長ければ template.yaml の drop_order の順(トイレ → 収納 → 同じ部屋の2カット目
     → 洗面 …)に削り、それでも長ければ部屋カットを均等に短縮。カット数を減らして1カットをゆったり見せるのを優先する。"""
     _assign_transitions(plan, cfg)
     lo, hi = cfg["duration"]["min"], cfg["duration"]["max"]

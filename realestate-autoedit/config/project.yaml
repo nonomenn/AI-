@@ -30,6 +30,11 @@ common_dir: ../共通           # 物件フォルダからの相対パス
 #   例(Windows): G:/マイドライブ/完成動画   例(Mac): ~/Library/CloudStorage/GoogleDrive-xxx/マイドライブ/完成動画
 publish_dir: ../完成          # 物件フォルダからの相対パス、または絶対パス
 
+# 完成フォルダに入れる動画(納品版)。チャットで受け取れる大きさ(30MB未満)に収めつつ画質を優先するため、
+# 同じ画質でファイルが約半分になる HEVC(H.265。iPhone の撮影と同じ形式、TikTok に投稿できる)で書き出す。
+# crf から始めて、max_mb を超えたら1ずつ上げて(画質を少しずつ下げて)収める
+deliver: {codec: hevc, crf: 18, max_crf: 26, max_mb: 29, preset: medium}
+
 common:
   ad: [広告, ad]               # 共通/ 直下のこの名前の画像(拡張子は問わない)
   bgm_dir: [BGM, bgm]

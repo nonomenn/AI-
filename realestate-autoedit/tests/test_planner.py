@@ -153,10 +153,24 @@ def test_highlights_bridges_and_opening(cfg, tpl):
     catch = [p for p in plan if p.section == "catch"]
     assert catch[0].seg.beauty >= 9                       # キャッチは一番映えるカット
     tour = [(p.section, p.room) for p in plan if p.section in ("rooms", "bridge")]
-    rooms = [r for s, r in tour if s == "rooms"]
     assert any(p.seg and p.seg.feature == "sauna" for p in plan)   # 珍しい見どころ(サウナ)は必ず映る
     assert ("bridge", "corridor") in tour                  # 水回り → LDK の区画の変わり目に廊下
     i = tour.index(("bridge", "corridor"))
     assert tour[i - 1][1] in ("washroom", "bathroom") and tour[i + 1][1] in ("living", "kitchen")
     _, total = timeline(plan)
     assert total <= cfg["duration"]["max"] + 0.01
+
+
+def test_core_rooms_keep_their_best_shot(cfg, tpl):
+    """LDK・キッチンは必ず部屋紹介に入り、その一番映えるカットは冒頭(キャッチ)に取られない。"""
+    best_ldk, other_ldk = seg(0, "living", beauty=9), seg(1, "living", beauty=6)
+    best_kit, other_kit = seg(2, "kitchen", beauty=9), seg(3, "kitchen", beauty=6)
+    pool = [best_ldk, other_ldk, best_kit, other_kit, seg(4, "exterior", beauty=7), seg(5, "balcony", beauty=7),
+            seg(6, "corridor"), seg(7, "bathroom", beauty=7), seg(8, "western_room", beauty=7)]
+    plan = build_plan(pool, cfg, tpl, "ad.png", log=lambda *_: None)
+    tour = {p.seg.id for p in plan if p.section == "rooms"}
+    opening = {p.seg.id for p in plan if p.section in ("hook", "catch")}
+    assert best_ldk.id in tour and best_kit.id in tour
+    assert best_ldk.id not in opening and best_kit.id not in opening
+    # 2カット目は見劣りするなら使わない(映え度 6 < 9-1)
+    assert other_ldk.id not in tour and other_kit.id not in tour

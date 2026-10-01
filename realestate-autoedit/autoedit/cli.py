@@ -245,6 +245,25 @@ def run(args):
         publish(pj, num, out, thumb_path, post_path)
 
 
+def deliver_video(src: str, dst: str, opt: dict | None):
+    """納品版の動画。opt が無ければそのままコピー。HEVC 指定なら、上限サイズに収まる範囲で一番高い画質で書き出す。"""
+    import shutil
+    import subprocess
+    if not opt or opt.get("codec") != "hevc":
+        shutil.copy2(src, dst)
+        return
+    crf = opt.get("crf", 18)
+    while True:
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", src, "-c:v", "libx265", "-crf", str(crf),
+                        "-preset", opt.get("preset", "medium"), "-tag:v", "hvc1", "-pix_fmt", "yuv420p",
+                        "-x265-params", "log-level=error", "-c:a", "copy", "-movflags", "+faststart", dst], check=True)
+        mb = os.path.getsize(dst) / 1e6
+        if mb <= opt.get("max_mb", 29) or crf >= opt.get("max_crf", 26):
+            print(f"  納品版: HEVC crf{crf}  {mb:.1f}MB")
+            return
+        crf += 1
+
+
 def publish(pj, num, video, thumb, post_txt):
     """完成フォルダ(project.yaml の publish_dir)に、物件ごとに 動画・サムネ・キャプション をまとめる。
     publish_dir を Google ドライブ(パソコン版)の同期フォルダにすれば、そのままドライブに保存される。"""
@@ -258,7 +277,7 @@ def publish(pj, num, video, thumb, post_txt):
     name = f"No.{num}_{pj.name}"
     d = os.path.normpath(os.path.join(os.path.expanduser(base), name))
     os.makedirs(d, exist_ok=True)
-    shutil.copy2(video, os.path.join(d, f"{name}.mp4"))
+    deliver_video(video, os.path.join(d, f"{name}.mp4"), L.get("deliver"))
     if thumb:
         shutil.copy2(thumb, os.path.join(d, f"{name}_サムネ.jpg"))
     shutil.copy2(post_txt, os.path.join(d, f"{name}_キャプション.txt"))

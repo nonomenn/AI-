@@ -118,6 +118,12 @@ def build_plan(segs: list[Segment], cfg: dict, tpl: dict, ad_image: str | None, 
         rs = [s for s in pool if s.room == room and not s.feature]
         if rs:
             reserved[room] = max(rs, key=lambda s: (s.beauty, s.score)).id
+    # 主要な生活空間(LDK・キッチン等)のベストカットは、部屋紹介のために必ず取っておく(冒頭にも使わせない)
+    core = next((s_.get("core_rooms", []) for s_ in tpl["sections"] if s_["id"] == "rooms"), [])
+    core_keep = [x for x in pool if x.id in {reserved[r] for r in core if r in reserved}]
+
+    def touches_core(x: Segment) -> bool:
+        return any(x.id == c.id or similarity(x, c) >= dup_thr for c in core_keep)
 
     plan: list[Shot] = []
 
@@ -150,7 +156,7 @@ def build_plan(segs: list[Segment], cfg: dict, tpl: dict, ad_image: str | None, 
             s = None
             # 冒頭テロップが言っている見どころ(例: ガレージ)が映っているカットがあれば、それを最初に見せる
             said = [h["key"] for h in highlights if any(w and w in hook_text for w in h.get("words", []))]
-            cands = [x for x in pool if x.feature in said and x.id not in used and not is_dup(x)]
+            cands = [x for x in pool if x.feature in said and x.id not in used and not is_dup(x) and not touches_core(x)]
             if cands:
                 s = max(cands, key=lambda x: _appeal(x, highlights))
             if not s:
@@ -167,7 +173,7 @@ def build_plan(segs: list[Segment], cfg: dict, tpl: dict, ad_image: str | None, 
                 avoid = tuple(sec.get("avoid", ())) + (tuple(taken_rooms) if sec.get("distinct_rooms") else ())
                 if sec.get("by_appeal"):
                     # 冒頭の数秒は、物件で一番映えるカットを見せて引きを強くする(見どころを優先)
-                    cands = [x for x in pool if x.id not in used and not is_dup(x)
+                    cands = [x for x in pool if x.id not in used and not is_dup(x) and not touches_core(x)
                              and (x.feature or x.room) not in avoid and x.room not in sec.get("avoid", ())]
                     s = max(cands, key=lambda x: _appeal(x, highlights)) if cands else None
                 else:
@@ -195,6 +201,9 @@ def build_plan(segs: list[Segment], cfg: dict, tpl: dict, ad_image: str | None, 
                 plan.append(_take(start_seg, sec["duration"], cfg, "start", telop="start"))
         elif sid == "rooms":
             plan.extend(_tour(sec, pool, bridges_pool, used, chosen, is_dup, dup_thr, highlights, cfg, tpl, log))
+            missing = [r for r in core if r in reserved and not any(p.room == r for p in plan if p.section == "rooms")]
+            if missing:
+                log(f"  ⚠ 主要な部屋が部屋紹介に入っていません: {', '.join(missing)}")
         elif sid == "cta":
             if cta_seg:
                 plan.append(_take(cta_seg, sec["duration"], cfg, "cta", telop="cta"))
@@ -212,6 +221,8 @@ def _tour(sec, pool, bridges_pool, used, chosen, is_dup, dup_thr, highlights, cf
     zones = tpl.get("zones", {})
     hl = {h["key"]: h for h in highlights}
 
+    second_gap = sec.get("second_shot_max_gap", 1.0)
+
     def take_best(cands, n):
         rs = []
         for s in sorted(cands, key=lambda s: (s.beauty, s.score), reverse=True):
@@ -219,6 +230,8 @@ def _tour(sec, pool, bridges_pool, used, chosen, is_dup, dup_thr, highlights, cf
                 break
             if s.id in used or is_dup(s) or any(similarity(s, r) >= dup_thr for r in rs):
                 continue   # すでに使ったカットと同じ構図 → 使わない
+            if rs and s.beauty < rs[0].beauty - second_gap:
+                break      # 2カット目は、1カット目とほぼ同じくらい映えるときだけ(見劣りするカットで水増ししない)
             rs.append(s)
         return rs
 
@@ -309,7 +322,11 @@ def _fit_duration(plan: list[Shot], cfg, tpl, log):
     max_shots = rooms_sec.get("max_room_shots", 99)
 
     def too_long():
-        return _total(plan, cfg) > hi or sum(p.section == "rooms" for p in plan) > max_shots
+        if sum(p.section == "rooms" for p in plan) > max_shots:
+            return True
+        # 各カットを少し短くするだけで収まるなら、部屋や見どころを丸ごと落とさない
+        slack = sum(max(0.0, p.duration - min_shot) for p in plan if p.section == "rooms")
+        return _total(plan, cfg) - slack > hi
 
     for item in drop_order:
         while too_long():
@@ -326,8 +343,13 @@ def _fit_duration(plan: list[Shot], cfg, tpl, log):
             elif item == "second_cuts":
                 # 2カット以上ある部屋から、映え度の低い方を落とす(残った方に部屋名テロップを付け直す)
                 shots = [p for p in plan if p.section == "rooms" and not p.feature]
+                # 主要な部屋の1カット目(ベスト)は落とさない。落とすのは2カット目以降
+                firsts = {}
+                for p in shots:
+                    if p.room not in firsts or (p.seg.beauty, p.seg.score) > (firsts[p.room].seg.beauty, firsts[p.room].seg.score):
+                        firsts[p.room] = p
                 multi = {r for r in {p.room for p in shots} if sum(q.room == r for q in shots) >= 2}
-                extras = [p for p in shots if p.room in multi]
+                extras = [p for p in shots if p.room in multi and firsts.get(p.room) is not p]
                 if not extras:
                     break
                 worst = min(extras, key=lambda p: (p.seg.beauty, p.seg.score))
@@ -337,7 +359,8 @@ def _fit_duration(plan: list[Shot], cfg, tpl, log):
                     next(p for p in plan if p.section == "rooms" and p.room == worst.room).telop = had_telop
             else:
                 present = {p.room for p in plan if p.section == "rooms" and not p.feature}
-                if item not in present or len(present) <= rooms_sec.get("min_rooms", 3):
+                if (item not in present or item in rooms_sec.get("core_rooms", [])
+                        or len(present) <= rooms_sec.get("min_rooms", 3)):
                     break
                 plan[:] = [p for p in plan if not (p.section == "rooms" and p.room == item and not p.feature)]
             _assign_transitions(plan, cfg)

@@ -36,6 +36,8 @@ sections:
     kind: rooms
     per_shot: [3.6, 5.2]   # 1カットの尺の範囲(秒)。映え度が高いカットほど長く見せる
     max_shots_per_room: 1
+    core_rooms: [living, kitchen]   # 主要な生活空間。必ず部屋紹介に入れ、ベストのカットは冒頭にも使わせない(落とさない)
+    second_shot_max_gap: 1.0        # 同じ部屋の2カット目は、映え度が1カット目より1以上低ければ使わない
     shots_per_room: {living: 2}          # 主役の部屋だけ2カット
     tour_order: walk       # walk = 家の中を歩いた長回しに出てくる順(1F→2F→3F)/ template = 上の order の順
     # 区画が大きく変わるところに、廊下・階段をゆったり進むカットをはさむ(長回しの中の、その間を歩いた部分から選ぶ)

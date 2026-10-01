@@ -199,8 +199,13 @@ def build_plan(segs: list[Segment], cfg: dict, tpl: dict, ad_image: str | None, 
         elif sid == "start":
             if start_seg:
                 plan.append(_take(start_seg, sec["duration"], cfg, "start", telop="start"))
+        elif sid == "common":
+            plan.extend(_common(sec, pool, used, chosen, is_dup, highlights, cfg,
+                               opening_clips={p.seg.clip for p in plan if p.seg}))
         elif sid == "rooms":
-            plan.extend(_tour(sec, pool, bridges_pool, used, chosen, is_dup, dup_thr, highlights, cfg, tpl, log))
+            skip = set(sections["common"]["rooms"]) if "common" in sections else set()
+            plan.extend(_tour(sec, pool, bridges_pool, used, chosen, is_dup, dup_thr, highlights, cfg, tpl, log,
+                              skip_near=skip))
             missing = [r for r in core if r in reserved and not any(p.room == r for p in plan if p.section == "rooms")]
             if missing:
                 log(f"  ⚠ 主要な部屋が部屋紹介に入っていません: {', '.join(missing)}")
@@ -213,7 +218,45 @@ def build_plan(segs: list[Segment], cfg: dict, tpl: dict, ad_image: str | None, 
     return plan
 
 
-def _tour(sec, pool, bridges_pool, used, chosen, is_dup, dup_thr, highlights, cfg, tpl, log) -> list[Shot]:
+def _common(sec, pool, used, chosen, is_dup, highlights, cfg, opening_clips=frozenset()) -> list[Shot]:
+    """共用部(マンションの外観・緑・エントランス・ロビー)。部屋に入る前に、建物の魅力をまとめて見せる。
+    sec["rooms"] の順に並べ、見どころ(near がその場所)はその場所の先頭に入れる。素材が無ければ何も入れない。"""
+    places = sec["rooms"]
+    lo, hi = sec["per_shot"]
+    keys = [h["key"] for h in highlights]
+    wanted = [(h["key"], True, (places.index(h["near"]), 0, keys.index(h["key"])))
+              for h in highlights if h.get("near") in places]
+    wanted += [(r, False, (places.index(r), 1, 0)) for r in places]
+    picked = []
+    for key, is_feat, order in wanted:
+        cands = [x for x in pool if (x.feature == key if is_feat else (x.room == key and not x.feature))
+                 and x.id not in used and not is_dup(x)]
+        if not cands:
+            continue
+        # 冒頭(掴み・キャッチ)で使ったクリップの続きより、別のクリップ(別の場所・別の画角)を優先する
+        s = max(cands, key=lambda x: (x.clip not in opening_clips, x.beauty, x.score))
+        used.add(s.id)
+        chosen.append(s)
+        picked.append((order, key, is_feat, s))
+    # 多すぎるときは、映え度の低いものから省く(珍しい見どころは残す)
+    rare = {h["key"] for h in highlights if h.get("rare")}
+    while len(picked) > sec.get("max_shots", len(picked)):
+        drop = min((p for p in picked if p[1] not in rare), key=lambda p: (p[3].beauty, p[3].score), default=None)
+        if drop is None:
+            break
+        picked.remove(drop)
+        used.discard(drop[3].id)
+        chosen.remove(drop[3])
+    out = []
+    for _, key, is_feat, s in sorted(picked, key=lambda p: p[0]):
+        sh = _take(s, _room_shot_len(s, lo, hi), cfg, "common", room=key, telop="room")
+        sh.feature = is_feat
+        out.append(sh)
+    return out
+
+
+def _tour(sec, pool, bridges_pool, used, chosen, is_dup, dup_thr, highlights, cfg, tpl, log,
+          skip_near=frozenset()) -> list[Shot]:
     """部屋紹介(ルームツアー)。基本の部屋 + この物件ならではの見どころ(highlights)を、
     歩いて回る順(1F→2F→3F)に並べ、区画が大きく変わるところに廊下・階段のつなぎを入れる。"""
     lo, hi = sec["per_shot"]
@@ -242,8 +285,8 @@ def _tour(sec, pool, bridges_pool, used, chosen, is_dup, dup_thr, highlights, cf
         if rs:
             stops.append((room, False, rs))
     for h in highlights:
-        if h.get("in_tour", True) is False:
-            continue
+        if h.get("in_tour", True) is False or h.get("near") in skip_near:
+            continue   # 共用部の見どころは、共用部のパートで見せる
         rs = take_best([s for s in pool if s.feature == h["key"]], 1)
         if rs:
             stops.append((h["key"], True, rs))
@@ -320,6 +363,12 @@ def _fit_duration(plan: list[Shot], cfg, tpl, log):
     #    尺が収まっていても、部屋紹介のカット数が max_room_shots を超えていれば落とす(忙しく見えないように)
     drop_order = rooms_sec.get("drop_order", [])
     max_shots = rooms_sec.get("max_room_shots", 99)
+    # 映えにくい部屋(トイレ等)は、部屋紹介が min_rooms に足りないときだけ入れる
+    for r in rooms_sec.get("only_if_few", []):
+        n_rooms = len({p.room for p in plan if p.section == "rooms"})
+        if n_rooms > rooms_sec.get("min_rooms", 0) and any(p.room == r for p in plan if p.section == "rooms"):
+            plan[:] = [p for p in plan if not (p.section == "rooms" and p.room == r)]
+            log(f"  {r} は省略(映えにくいため。部屋が少ないときだけ入れる)")
 
     def too_long():
         if sum(p.section == "rooms" for p in plan) > max_shots:
@@ -408,6 +457,8 @@ def _assign_transitions(plan: list[Shot], cfg, zones: dict | None = None):
             t = tr["to_cta"]
         elif prev.section == "start" and p.section in ("rooms", "bridge"):
             t = tr["tour_start"]
+        elif prev.section == "common" and p.section == "start":
+            t = tr["zone_change"]                             # 共用部 → 住戸へ: 章が変わる
         elif p.section == "bridge":
             t = tr.get("to_bridge", tr["motion_mismatch"])   # 部屋 → 廊下・階段: やわらかく
         elif prev.section == "bridge" and _motion_ok(prev, p, tol):

@@ -184,6 +184,9 @@ room は次から選ぶ: {room_types}
 beauty(0〜10)の基準: 高級感・明るさ・構図の美しさ・その物件の魅力(眺望、デザイン照明、広さ)が伝わるか。
 is_transit: ドアを通過中、壁や床しか映っていない、部屋から部屋への移動途中など「見せ場ではない」カットなら true。
 feature: この物件の見どころ({features})のどれかが主役として映っていれば、その名前。無ければ空文字。
+window_only: 窓辺に寄って、窓・ブラインド・窓越しの景色だけを写した画角(部屋の広がりが分からない)なら true。
+映えないので使わない。眺望は、バルコニーからのカットや、景色そのものを主役に広く撮ったカットで見せる
+(窓枠・ブラインドがほぼ入らず、景色が画面の大半を占める眺望カットは false)。
 bridge_ok: 廊下や階段を、ゆっくり落ち着いて進んでいる(奥の部屋や窓に向かっている)カットなら true。
 大きく場面が変わるところのつなぎに使う。壁しか映っていない・速い・揺れているなら false。
 same_room: 3コマすべてで、その部屋が主役として映っているなら true。途中で廊下・ドア・別の部屋に移る
@@ -200,8 +203,9 @@ def _classify_schema(room_types, features=()):
                            "beauty": {"type": "number"}, "is_transit": {"type": "boolean"},
                            "same_room": {"type": "boolean"}, "note": {"type": "string"},
                            "feature": {"type": "string", "enum": [""] + list(features)},
-                           "bridge_ok": {"type": "boolean"}},
-            "required": ["id", "room", "beauty", "is_transit", "same_room", "note", "feature", "bridge_ok"],
+                           "bridge_ok": {"type": "boolean"}, "window_only": {"type": "boolean"}},
+            "required": ["id", "room", "beauty", "is_transit", "same_room", "note", "feature", "bridge_ok",
+                         "window_only"],
             "additionalProperties": False}}},
         "required": ["cuts"], "additionalProperties": False,
     }
@@ -254,6 +258,9 @@ def classify_segments(segs: list[Segment], room_types: list[str], floorplan: dic
             s.bridge = bool(r.get("bridge_ok", False)) and s.room in ("corridor", "stairs", "genkan", "other")
             s.is_transit = (bool(r.get("is_transit", False)) or not r.get("same_room", True)) and not s.bridge
             s.note = str(r.get("note", "")) + ("" if r.get("same_room", True) else " (途中で場所が変わる→不使用)")
+            if r.get("window_only"):
+                s.is_transit, s.bridge = True, False
+                s.note += " (窓辺だけの画角→不使用)"
         log(f"  AI判定 {min(b + batch, len(segs))}/{len(segs)} カット")
 
 
@@ -276,6 +283,7 @@ def apply_manual_labels(segs: list[Segment], labels_path: str, min_len: float = 
         - {from: 6, to: 9, room: kitchen}
         - {from: 9, to: 12, room: closet, feature: pantry}       # 見どころ(highlights の key)
         - {from: 12, to: 15, room: corridor, bridge: true}       # 場面のつなぎに使う廊下
+        - {from: 15, to: 18, room: living, window_only: true}    # 窓辺だけの画角(使わない)
     """
     with open(labels_path, encoding="utf-8") as f:
         labels = yaml.safe_load(f) or {}
@@ -304,4 +312,7 @@ def apply_manual_labels(segs: list[Segment], labels_path: str, min_len: float = 
                 if s.bridge:
                     s.is_transit = False   # つなぎに使う廊下・階段は「移動中」でも使う
                 s.note = r.get("note", "")
+                if r.get("window_only"):
+                    s.is_transit, s.bridge = True, False
+                    s.note = (s.note + " 窓辺だけの画角のため不使用").strip()
                 break

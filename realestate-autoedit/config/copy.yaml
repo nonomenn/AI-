@@ -16,6 +16,8 @@ rooms:
   bathroom:      {title: "bath room",    sub: "心身を癒すリラックス空間"}
   toilet:        {title: "toilet",       sub: "気持ちよく使える清潔空間"}
   balcony:       {title: "Balcony",      sub: "開放感あふれる眺望"}
+  exterior:      {title: "Exterior",     sub: "存在感のある外観"}
+  entrance_hall: {title: "Entrance",     sub: "上質な共用エントランス"}
 
 cta:
   text: "気になった方は詳細とコメント"

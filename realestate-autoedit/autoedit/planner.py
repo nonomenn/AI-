@@ -15,7 +15,7 @@ class Shot:
     speed: float = 1.0
     room: str = ""
     telop: str | None = None     # 表示するテロップID
-    telop_span: int = 1          # 何カットにまたがってテロップを出すか(キャッチ用)
+    telop_span: int = 1          # 何カットにまたがってテロップを出すか(キャッチ、同じ部屋の2カット目)
     image: str | None = None     # 静止画(広告)
     transition_in: dict = field(default_factory=dict)
     interp: str = ""             # 30fps素材をスローにするときの中間コマの作り方(blend / flow)
@@ -215,7 +215,21 @@ def build_plan(segs: list[Segment], cfg: dict, tpl: dict, ad_image: str | None, 
 
     _fit_duration(plan, cfg, tpl, log)
     _assign_transitions(plan, cfg)
+    _carry_room_telops(plan)
     return plan
+
+
+def _carry_room_telops(plan: list[Shot]) -> None:
+    """同じ場所で画角だけ変わるとき(LDKの2カット目など)は、部屋名テロップを消さずに次のカットへ引き継ぐ。
+    出し直さず、1つのテロップが続けて表示される(キャッチと同じ telop_span の仕組み)。"""
+    for i, p in enumerate(plan):
+        if p.telop != "room":
+            continue
+        n = 1
+        while (i + n < len(plan) and plan[i + n].section == p.section and plan[i + n].room == p.room
+               and not plan[i + n].telop):
+            n += 1
+        p.telop_span = n
 
 
 def _common(sec, pool, used, chosen, is_dup, highlights, cfg, opening_clips=frozenset()) -> list[Shot]:

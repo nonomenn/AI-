@@ -225,3 +225,17 @@ def test_window_only_shots_are_not_used(tmp_path, cfg, tpl):
     pool = [win, room, seg(1, "kitchen"), seg(2, "exterior"), seg(3, "corridor"), seg(4, "balcony")]
     plan = build_plan(pool, cfg, tpl, None, log=lambda *_: None)
     assert all(p.seg.id != win.id for p in plan if p.seg)
+
+
+def test_room_telop_carries_over_same_room(cfg, tpl):
+    """同じ部屋で画角が変わるとき(LDKの2カット目)は、部屋名テロップを消さずに引き継ぐ。"""
+    pool = [seg(0, "living", beauty=9), seg(1, "living", beauty=9), seg(2, "kitchen", beauty=8),
+            seg(3, "exterior", beauty=10), seg(4, "balcony", beauty=8), seg(5, "corridor"), seg(6, "western_room"),
+            seg(7, "view", beauty=10), seg(8, "dining", beauty=10)]   # 冒頭は外観・眺望などで埋まる
+    plan = build_plan(pool, cfg, tpl, None, log=lambda *_: None)
+    rooms = [p for p in plan if p.section == "rooms"]
+    liv = [i for i, p in enumerate(plan) if p.section == "rooms" and p.room == "living"]
+    assert len(liv) == 2 and liv[1] == liv[0] + 1
+    assert plan[liv[0]].telop == "room" and plan[liv[0]].telop_span == 2
+    assert plan[liv[1]].telop is None                       # 出し直さず、1つのテロップが続く
+    assert all(p.telop_span == 1 for p in rooms if p.room != "living")

@@ -13,7 +13,9 @@ from .media import grab_frame
 TILE_W = 180
 
 
-def _label(shot, copy, props) -> str:
+def _label(shot, copy, props, carried=False) -> str:
+    if carried:
+        return "テロップ: 前のカットから継続"
     if shot.telop == "room":
         r = (props.get("rooms") or {}).get(shot.room) or copy["rooms"].get(shot.room) or {}
         return f"テロップ「{r.get('title', '')}」"
@@ -25,7 +27,11 @@ def _label(shot, copy, props) -> str:
 def cut_sheet(plan, starts, copy: dict, props: dict, font_path: str, out_path: str) -> str:
     font = ImageFont.truetype(font_path, 22)
     rows = []
-    for st, p in zip(starts, plan):
+    carried = set()   # 前のカットからテロップを引き継いでいるカット
+    for i, p in enumerate(plan):
+        if p.telop:
+            carried.update(range(i + 1, i + p.telop_span))
+    for i, (st, p) in enumerate(zip(starts, plan)):
         if not p.seg:
             continue
         src_len = p.duration * p.speed
@@ -40,7 +46,7 @@ def cut_sheet(plan, starts, copy: dict, props: dict, font_path: str, out_path: s
         im = Image.fromarray(cv2.cvtColor(strip, cv2.COLOR_BGR2RGB))
         info = Image.new("RGB", (420, h), (24, 24, 24))
         d = ImageDraw.Draw(info)
-        lines = [f"{st:5.1f}s  {p.section}", f"部屋: {p.room}", _label(p, copy, props),
+        lines = [f"{st:5.1f}s  {p.section}", f"部屋: {p.room}", _label(p, copy, props, i in carried),
                  f"{p.seg.id}", f"素材 {p.src_start:.1f}〜{p.src_start + src_len:.1f}s", f"映え {p.seg.beauty:.0f}  {p.seg.note}"]
         for k, ln in enumerate(lines):
             d.text((14, 14 + k * 34), ln, font=font, fill=(255, 220, 140) if k in (1, 2) else (230, 230, 230))

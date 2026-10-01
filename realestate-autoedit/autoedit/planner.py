@@ -77,6 +77,14 @@ def _appeal(s: Segment, highlights: list[dict]) -> float:
     return s.beauty + max(0.0, bonus) + 0.5 * s.score
 
 
+def _same_take(a: Segment, b: Segment, gap: float = 6.0) -> bool:
+    """同じクリップの、同じ場所を続けて撮った映像の続き(間が gap 秒以内)。
+    画角が少しずつ変わるので特徴点では別映像に見えるが、2回使うと「同じ映像の続き」に見える。"""
+    if a.clip != b.clip or (a.feature or a.room) != (b.feature or b.room):
+        return False
+    return max(a.start, b.start) - min(a.end, b.end) <= gap
+
+
 def _walk_clip(pool: list[Segment]) -> str | None:
     """家の中を歩いて撮った長回し(部屋の種類が一番多いクリップ)。部屋を回る順番の手がかりにする。"""
     by_clip: dict[str, set] = {}
@@ -98,7 +106,7 @@ def build_plan(segs: list[Segment], cfg: dict, tpl: dict, ad_image: str | None, 
     chosen: list[Segment] = []          # 実際に使ったカット(同じ構図の2回使いを避けるため)
 
     def is_dup(s: Segment) -> bool:
-        return any(similarity(s, c) >= dup_thr for c in chosen if c.id != s.id)
+        return any(_same_take(s, c) or similarity(s, c) >= dup_thr for c in chosen if c.id != s.id)
 
     def pick(prefer: list[str], by_beauty=True, exclude_rooms=()):
         cands = [s for s in pool if s.id not in used and s.room not in exclude_rooms and not is_dup(s)]
@@ -123,7 +131,7 @@ def build_plan(segs: list[Segment], cfg: dict, tpl: dict, ad_image: str | None, 
     core_keep = [x for x in pool if x.id in {reserved[r] for r in core if r in reserved}]
 
     def touches_core(x: Segment) -> bool:
-        return any(x.id == c.id or similarity(x, c) >= dup_thr for c in core_keep)
+        return any(x.id == c.id or _same_take(x, c) or similarity(x, c) >= dup_thr for c in core_keep)
 
     plan: list[Shot] = []
 
@@ -285,8 +293,8 @@ def _tour(sec, pool, bridges_pool, used, chosen, is_dup, dup_thr, highlights, cf
         for s in sorted(cands, key=lambda s: (s.beauty, s.score), reverse=True):
             if len(rs) >= n:
                 break
-            if s.id in used or is_dup(s) or any(similarity(s, r) >= dup_thr for r in rs):
-                continue   # すでに使ったカットと同じ構図 → 使わない
+            if s.id in used or is_dup(s) or any(_same_take(s, r) or similarity(s, r) >= dup_thr for r in rs):
+                continue   # すでに使ったカットと同じ構図・同じ映像の続き → 使わない
             if rs and s.beauty < rs[0].beauty - second_gap:
                 break      # 2カット目は、1カット目とほぼ同じくらい映えるときだけ(見劣りするカットで水増ししない)
             rs.append(s)
@@ -313,10 +321,16 @@ def _tour(sec, pool, bridges_pool, used, chosen, is_dup, dup_thr, highlights, cf
 
     # 並べる順番: 長回し(家の中を歩いた映像)があれば、その中で出てくる順 = 実際に歩いて回る順
     walk = _walk_clip(pool + bridges_pool) if sec.get("tour_order", "walk") == "walk" else None
+    single_rooms = set(sec.get("core_rooms", [])) | {"dining"}
 
     def pos(stop):
+        # 1つしかない部屋(LDK・キッチン等)は、長回しの中で最初に入ったところの順(使うカットが後で撮った別アングルでも)。
+        # 洋室・収納などは同じ種類の別の部屋がいくつもあるので、使うカットを撮った位置の順
         key, is_feat, rs = stop
-        t = [s.start for s in rs if s.clip == walk]
+        t = []
+        if walk and not is_feat and key in single_rooms:
+            t = [s.start for s in pool if s.clip == walk and s.room == key]
+        t = t or [s.start for s in rs if s.clip == walk]
         if not t and walk:
             t = [s.start for s in pool if s.clip == walk and (s.feature == key if is_feat else s.room == key)]
         if t:

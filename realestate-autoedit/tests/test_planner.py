@@ -239,3 +239,19 @@ def test_room_telop_carries_over_same_room(cfg, tpl):
     assert plan[liv[0]].telop == "room" and plan[liv[0]].telop_span == 2
     assert plan[liv[1]].telop is None                       # 出し直さず、1つのテロップが続く
     assert all(p.telop_span == 1 for p in rooms if p.room != "living")
+
+
+def test_same_take_not_reused_and_tour_follows_first_visit(cfg, tpl):
+    """同じクリップの続き(数秒しか離れていない同じ場所)は別カット扱いしない。
+    部屋紹介は、長回しの中でその部屋に最初に入った順に並べる(後で撮った別アングルを使っても)。"""
+    a = _walk_seg(0, "living", 10, beauty=9)
+    a_next = _walk_seg(1, "living", 16, beauty=9)          # aの続き(1秒後)
+    late = _walk_seg(2, "living", 120, beauty=8)
+    pool = [_walk_seg(3, "corridor", 0), a, a_next, _walk_seg(4, "kitchen", 40, beauty=8),
+            _walk_seg(5, "western_room", 60), _walk_seg(6, "washroom", 80), late,
+            seg(7, "exterior", beauty=8), seg(8, "balcony", beauty=8), seg(9, "view", beauty=8)]
+    plan = build_plan(pool, cfg, tpl, None, log=lambda *_: None)
+    used = [p.seg.id for p in plan if p.seg]
+    assert not (a.id in used and a_next.id in used)
+    tour = [p.room for p in plan if p.section == "rooms"]
+    assert tour[0] == "living"                             # LDKは最初に入った位置(10秒)で並ぶ

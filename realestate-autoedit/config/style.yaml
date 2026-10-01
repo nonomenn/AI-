@@ -68,39 +68,45 @@ fonts:
     [NotoSerifCJK-Bold.ttc, NotoSerifCJK-Black.ttc, NotoSerifJP-Black.otf, NotoSerifCJKjp-Black.otf, NotoSerifJP-Black.ttf, "ヒラギノ明朝 ProN.ttc", yumindb.ttf]
   serif_bold_thumb:    # サムネのサブ・情報バー・物件番号
     [NotoSerifCJK-Bold.ttc, NotoSerifJP-Bold.otf, NotoSerifCJKjp-Bold.otf, NotoSerifJP-Bold.ttf, "ヒラギノ明朝 ProN.ttc", yumindb.ttf]
-  sans_bold:     # CTA・ルームツアーSTART
+  sans_medium:   # CTA(今の動画は中くらいの太さのゴシック)
+    [NotoSansCJK-Medium.ttc, NotoSansJP-Medium.otf, NotoSansCJKjp-Medium.otf, NotoSansJP-Medium.ttf, "ヒラギノ角ゴシック W5.ttc", YuGothM.ttc]
+  sans_bold:     # ルームツアーSTART
     [NotoSansCJK-Bold.ttc, NotoSansJP-Bold.otf, NotoSansCJKjp-Bold.otf, NotoSansJP-Bold.ttf, "ヒラギノ角ゴシック W6.ttc", YuGothB.ttc]
 
 # ---------- テロップ ----------
 # 影は「くっきりしたドロップシャドウ + 広くやわらかい影」の重ねがけ。明るい白壁の上でも読めるようにする
 telops:
-  hook:            # 冒頭の見所(動画冒頭テロップ)
+  # 寸法・影は今のTOALU動画(No.L035)の画面から採寸(画面→動画座標に換算)
+  hook:            # 冒頭の見所(動画冒頭テロップ)。今の動画: 幅954px・中心y462
     font: heavy_serif
-    size: 84
-    center_y: 450
-    max_width: 960
+    size: 104
+    palt: true                   # かな・句読点を詰める(今の動画と同じ詰め方)
+    x_scale: 0.85                # 横方向に少し縮めて、背の高い文字にする
+    center_y: 462
+    max_width: 954
     color: [255, 255, 255]
     italic_skew: 0.12            # 斜体の傾き
     shadow:
-      - {offset: [0, 0], blur: 22, spread: 6, color: [0, 0, 0], opacity: 0.55}   # 文字の周りを暗くする広い影
-      - {offset: [7, 7], blur: 2, color: [0, 0, 0], opacity: 0.95}              # くっきりした黒のドロップシャドウ
+      - {offset: [9, 10], blur: 4, color: [0, 0, 0], opacity: 0.45}             # 押し出し影の下のやわらかい影
+      - {offset: [6, 6], blur: 0, extrude: true, color: [0, 0, 0], opacity: 1.0}  # くっきりした黒の押し出し影(立体的)
     fade_in: 0.35
     fade_out: 0.3
 
-  catch:           # キャッチ + 傍点
+  catch:           # キャッチ + 傍点。今の動画: 傍点〜2行目で y367〜600、行の間隔100px、傍点の半径17px
     font: heavy_serif
-    size: 78
-    center_y: 470
-    line_spacing: 1.28
+    size: 92
+    palt: true
+    center_y: 483                # 傍点を含むブロック全体の中心
+    line_spacing: 1.087
     max_width: 1000
     color: [255, 255, 255]
     italic_skew: 0.12
     shadow:
-      - {offset: [0, 0], blur: 22, spread: 6, color: [0, 0, 0], opacity: 0.55}
-      - {offset: [7, 7], blur: 2, color: [0, 0, 0], opacity: 0.95}
+      - {offset: [9, 10], blur: 4, color: [0, 0, 0], opacity: 0.45}
+      - {offset: [6, 6], blur: 0, extrude: true, color: [0, 0, 0], opacity: 1.0}
     emphasis_dot:
-      radius: 12
-      gap_above: 14
+      radius: 17
+      gap_above: 12
       blink: {period: 0.9, min_alpha: 0.12}    # 傍点だけ点滅(周期・いちばん暗いときの濃さ)
     fade_in: 0.35
     fade_out: 0.3
@@ -122,31 +128,39 @@ telops:
 
   room:            # 部屋紹介「Living / 暮らしの中心になる心地よい空間」
     # 書体とサイズは現状の Premiere テキストスタイル(Zen Antique 90px / 45px)
+    # 今の動画: 「Living」幅246px・中心y330、サブ幅564px・中心y400(字間を広く)
     title_font: latin_serif
-    title_size: 90
+    title_size: 82
     sub_font: serif_bold
-    sub_size: 45
-    center_y: 330                # 英字タイトルの中心
-    sub_gap: 18
+    sub_size: 38
+    sub_letter_spacing: 3        # サブコピーの字間(px)
+    center_y: 306                # 英字タイトル(行の高さ)の中心
+    sub_gap: 14
     color: [255, 255, 255]
     shadow:
-      - {offset: [0, 0], blur: 20, spread: 5, color: [0, 0, 0], opacity: 0.6}
-      - {offset: [4, 5], blur: 3, color: [0, 0, 0], opacity: 0.85}
+      - {offset: [4, 5], blur: 5, color: [0, 0, 0], opacity: 0.75}
     fade_in: 0.8                 # ふわっと出す
     rise: 14                     # 出るときに少し浮き上がる(px)
     fade_out: 0.5
     delay: 0.4                   # カット頭から少し遅らせて出す
 
   cta:             # 「気になった方は詳細とコメント✓」+ 矢印
-    font: sans_bold
-    size: 50
-    center_y: 460
+    font: sans_medium
+    size: 56
+    palt: true
+    letter_spacing: -3           # 字間を詰める
+    x_scale: 0.86                # 今の動画の文字は縦長でつまっている
+    text_shadow: [{offset: [2, 3], blur: 2, color: [0, 0, 0], opacity: 0.6}]
+    center_y: 463                # 今の動画: 枠 754×95px・中心(539,463)
     center_x: 540
-    italic_skew: 0.14
+    italic_skew: 0.22
     color: [255, 255, 255]
-    box: {pad_x: 28, pad_y: 14, border: 4, border_color: [255, 255, 255], fill: [0, 0, 0], fill_opacity: 0.35}
+    box: {pad_x: 33, pad_y: 8, border: 4, border_color: [255, 255, 255], fill: [0, 0, 0], fill_opacity: 0.35}
     check_icon: true
+    check_scale: 0.95            # ✓アイコンの大きさ(文字サイズ比)
+    check_gap: 0                 # 文字と✓の間
     fade_in: 0.4
+    reveal: {duration: 0.33, start: 0.04}   # 横線から上下に開いて現れる(秒、最初の高さの割合)
     # ---- 矢印:TikTokのアカウントアイコンを真横から指す ----
     # target = アイコン中心の推定位置(1080x1920 動画座標)。画面録画から採寸: 中心 ≒ (953, 960)、半径 ≒ 54px
     arrow:

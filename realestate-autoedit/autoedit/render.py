@@ -182,11 +182,18 @@ TRANSITION_NAMES = {
 }
 
 
-def _composite(frame: np.ndarray, layer: Layer, alpha: float, dx: float, dy: float):
-    if alpha <= 0.001:
+def _composite(frame: np.ndarray, layer: Layer, alpha: float, dx: float, dy: float, reveal: float = 1.0):
+    """テロップを重ねる。reveal < 1 のときは、上下の中央から reveal の割合の高さだけ見せる(開くアニメーション)。"""
+    if alpha <= 0.001 or reveal <= 0.0:
         return
     img = layer.img
     h, w = img.shape[:2]
+    if reveal < 1.0:
+        band = max(1, int(round(h * reveal)))
+        top = (h - band) // 2
+        img = img[top:top + band]
+        dy += top
+        h = band
     x = int(round(layer.x + dx)); y = int(round(layer.y + dy))
     H, W = frame.shape[:2]
     x0, y0 = max(0, x), max(0, y)
@@ -266,8 +273,7 @@ def render(plan: list[Shot], cfg: dict, fonts: dict, props: dict, copy: dict, ou
         for (t0, t1, layers) in telops:
             if t0 <= t < t1:
                 for L in layers:
-                    al, dx, dy = L.anim(t - t0, t1 - t0)
-                    _composite(frame, L, al, dx, dy)
+                    _composite(frame, L, *L.anim(t - t0, t1 - t0))
         if end_fade and t > total - end_fade:
             k = _ease((total - t) / end_fade)
             frame = (frame.astype(np.float32) * k).astype(np.uint8)

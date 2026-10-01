@@ -82,7 +82,12 @@ def _shadowed(text_img: Image.Image, shadow) -> Image.Image:
         sh = Image.new("RGBA", text_img.size, tuple(sd["color"]) + (0,))
         sh.putalpha(aa.point(lambda v, o=sd.get("opacity", 0.8): int(v * o)))
         canvas = Image.new("RGBA", out.size, (0, 0, 0, 0))
-        canvas.paste(sh, (pad + ox, pad + oy), sh)
+        if sd.get("extrude"):  # 押し出し影: 1px ずつずらして重ね、立体的なくっきりした影にする
+            steps = max(abs(ox), abs(oy), 1)
+            for k in range(1, steps + 1):
+                canvas.paste(sh, (pad + round(ox * k / steps), pad + round(oy * k / steps)), sh)
+        else:
+            canvas.paste(sh, (pad + ox, pad + oy), sh)
         if blur:
             canvas = canvas.filter(ImageFilter.GaussianBlur(blur))
         out = Image.alpha_composite(out, canvas)
@@ -91,12 +96,13 @@ def _shadowed(text_img: Image.Image, shadow) -> Image.Image:
 
 
 def _text_lines(lines, font, color, spacing=1.2, letter_spacing=0, dots: list[list[int]] | None = None,
-                dot_cfg: dict | None = None, parts: str = "all", crop_box=None) -> Image.Image:
+                dot_cfg: dict | None = None, parts: str = "all", crop_box=None, features=None) -> Image.Image:
     """複数行のテキストを中央揃えで描画。spacing=行送り(文字サイズ比)。dots=各行の傍点を付ける文字インデックス。"""
+    def adv(c):  # features=["palt"] でかなや句読点を詰める(今の動画のテロップと同じ詰め方)
+        return font.getlength(c, features=features) if features else font.getlength(c)
+
     def line_w(s):
-        if letter_spacing:
-            return sum(font.getlength(c) for c in s) + letter_spacing * SS * (len(s) - 1)
-        return font.getlength(s)
+        return sum(adv(c) for c in s) + letter_spacing * SS * (len(s) - 1)
 
     em = font.size
     top = font.getbbox("国")[1]                 # 描画原点から字面の上端までの距離
@@ -115,11 +121,11 @@ def _text_lines(lines, font, color, spacing=1.2, letter_spacing=0, dots: list[li
         for c in s:
             xs.append(x)
             if parts in ("all", "text"):
-                d.text((x, y), c, font=font, fill=tuple(color) + (255,))
-            x += font.getlength(c) + letter_spacing * SS
+                d.text((x, y), c, font=font, fill=tuple(color) + (255,), features=features)
+            x += adv(c) + letter_spacing * SS
         if dots and li < len(dots) and parts in ("all", "dots"):
             for ci in dots[li]:
-                cx = xs[ci] + font.getlength(s[ci]) / 2
+                cx = xs[ci] + adv(s[ci]) / 2
                 cy = y + top - dot_cfg["gap_above"] * SS - r
                 d.ellipse((cx - r, cy - r, cx + r, cy + r), fill=tuple(color) + (255,))
         y += lh
@@ -129,6 +135,13 @@ def _text_lines(lines, font, color, spacing=1.2, letter_spacing=0, dots: list[li
         return im.crop(crop_box)
     bbox = im.getbbox()
     return im.crop(bbox) if bbox else im
+
+
+def _x_scale(im: Image.Image, k: float) -> Image.Image:
+    """横方向だけ縮める(長体)。"""
+    if not k or abs(k - 1.0) < 1e-3:
+        return im
+    return im.resize((max(1, round(im.width * k)), im.height), Image.LANCZOS)
 
 
 def _parse_emphasis(text: str):
@@ -152,11 +165,13 @@ def _parse_emphasis(text: str):
 def make_hook(text, cfg, fonts) -> list[Layer]:
     c = cfg["telops"]["hook"]
     size = c["size"]
+    feats = ["palt"] if c.get("palt") else None
+    xs = c.get("x_scale", 1.0)
     font = _font(fonts[c["font"]], size * SS)
-    while font.getlength(text) > c["max_width"] * SS and size > 40:
+    while font.getlength(text, features=feats) * xs > c["max_width"] * SS and size > 40:
         size -= 2
         font = _font(fonts[c["font"]], size * SS)
-    im = _text_lines([text], font, c["color"])
+    im = _x_scale(_text_lines([text], font, c["color"], features=feats), xs)
     im = _shadowed(_skew(im, c["italic_skew"]), c["shadow"])
     return [_to_layer(im, cfg["canvas"]["width"] / 2, c["center_y"], fade_anim(c["fade_in"], c["fade_out"]))]
 
@@ -166,16 +181,20 @@ def make_catch(text, cfg, fonts) -> list[Layer]:
     lines, dots = _parse_emphasis(text)
     size = c["size"]
     font = _font(fonts[c["font"]], size * SS)
-    while max(font.getlength(s) for s in lines) > c["max_width"] * SS and size > 40:
+    feats = ["palt"] if c.get("palt") else None
+    xs = c.get("x_scale", 1.0)
+    while max(font.getlength(s, features=feats) for s in lines) * xs > c["max_width"] * SS and size > 40:
         size -= 2
         font = _font(fonts[c["font"]], size * SS)
     dc = c["emphasis_dot"]
-    full = _text_lines(lines, font, c["color"], c["line_spacing"], dots=dots, dot_cfg=dc, crop_box=False)
+    full = _text_lines(lines, font, c["color"], c["line_spacing"], dots=dots, dot_cfg=dc, crop_box=False,
+                       features=feats)
     box = full.getbbox()
 
     def part(which):
-        im = _text_lines(lines, font, c["color"], c["line_spacing"], dots=dots, dot_cfg=dc, parts=which, crop_box=box)
-        return _shadowed(_skew(im, c["italic_skew"]), c["shadow"])
+        im = _text_lines(lines, font, c["color"], c["line_spacing"], dots=dots, dot_cfg=dc, parts=which, crop_box=box,
+                         features=feats)
+        return _shadowed(_skew(_x_scale(im, xs), c["italic_skew"]), c["shadow"])
 
     W = cfg["canvas"]["width"]
     base = fade_anim(c["fade_in"], c["fade_out"])
@@ -227,7 +246,7 @@ def make_room(title, sub, cfg, fonts) -> list[Layer]:
     tf = _font(fonts[c["title_font"]], c["title_size"] * SS)
     sf = _font(fonts[c["sub_font"]], c["sub_size"] * SS)
     t_im = _text_lines([title], tf, c["color"])
-    s_im = _text_lines([sub], sf, c["color"]) if sub else None
+    s_im = _text_lines([sub], sf, c["color"], letter_spacing=c.get("sub_letter_spacing", 0)) if sub else None
     gap = c["sub_gap"] * SS
     W = max(t_im.width, s_im.width if s_im else 0)
     H = t_im.height + (gap + s_im.height if s_im else 0)
@@ -255,12 +274,16 @@ def _check_icon(size_px, color) -> Image.Image:
 def make_cta(text, cfg, fonts) -> list[Layer]:
     c = cfg["telops"]["cta"]
     font = _font(fonts[c["font"]], c["size"] * SS)
-    t_im = _text_lines([text], font, c["color"])
+    t_im = _x_scale(_text_lines([text], font, c["color"], letter_spacing=c.get("letter_spacing", 0),
+                                features=["palt"] if c.get("palt") else None), c.get("x_scale", 1.0))
+    if c.get("text_shadow"):
+        t_im = _shadowed(t_im, c["text_shadow"])
     if c.get("check_icon"):
-        ic = _check_icon(int(c["size"] * 0.82 * SS), c["color"])
-        comb = Image.new("RGBA", (t_im.width + ic.width + 8 * SS, max(t_im.height, ic.height)), (0, 0, 0, 0))
+        ic = _check_icon(int(c["size"] * c.get("check_scale", 0.82) * SS), c["color"])
+        gap = int(c.get("check_gap", 8) * SS)
+        comb = Image.new("RGBA", (t_im.width + ic.width + gap, max(t_im.height, ic.height)), (0, 0, 0, 0))
         comb.alpha_composite(t_im, (0, (comb.height - t_im.height) // 2))
-        comb.alpha_composite(ic, (t_im.width + 8 * SS, (comb.height - ic.height) // 2))
+        comb.alpha_composite(ic, (t_im.width + gap, (comb.height - ic.height) // 2))
         t_im = comb
     t_im = _skew(t_im, c["italic_skew"])
     b = c["box"]
@@ -270,7 +293,14 @@ def make_cta(text, cfg, fonts) -> list[Layer]:
     d.rectangle((0, 0, box.width - 1, box.height - 1), fill=tuple(b["fill"]) + (int(255 * b["fill_opacity"]),),
                 outline=tuple(b["border_color"]) + (255,), width=bw)
     box.alpha_composite(t_im, (px, py))
-    layers = [_to_layer(box, c["center_x"], c["center_y"], fade_anim(c["fade_in"], 0.0))]
+    rv = c.get("reveal")
+    if rv:  # 横線から上下に開いて現れる(今の動画と同じ)
+        def box_anim(t, dur):
+            p = _ease(t / rv["duration"]) if rv["duration"] else 1.0
+            return (1.0 if t > 0 else 0.0), 0.0, 0.0, rv["start"] + (1 - rv["start"]) * p
+    else:
+        box_anim = fade_anim(c["fade_in"], 0.0)
+    layers = [_to_layer(box, c["center_x"], c["center_y"], box_anim)]
     layers.append(make_arrow(cfg))
     return layers
 

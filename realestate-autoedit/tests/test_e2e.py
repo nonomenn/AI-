@@ -46,3 +46,4 @@ def test_project_mode_end_to_end(tmp_path):
     assert (done / "No.L001_阿波座テスト.mp4").is_file()
     cap = (done / "No.L001_阿波座テスト_キャプション.txt").read_text(encoding="utf-8")
     assert "No.L001" in cap and "【L001】" in cap
+    assert cap.startswith("No.L001") and "■" not in cap and "投稿タイトル" not in cap   # キャプション本文だけ

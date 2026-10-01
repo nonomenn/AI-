@@ -239,10 +239,10 @@ def run(args):
         render(plan, cfg, fonts, props, copy, out, bgm=bgm)
 
     print("[+] サムネイル・投稿文")
-    num, thumb_path, post_path = make_post_assets(args, cfg, fonts, props, plan, out_dir, stem, base_dir, counter,
-                                                  thumb_photo)
+    num, thumb_path, caption_path = make_post_assets(args, cfg, fonts, props, plan, out_dir, stem, base_dir, counter,
+                                                     thumb_photo)
     if args.project and not args.plan_only:
-        publish(pj, num, out, thumb_path, post_path)
+        publish(pj, num, out, thumb_path, caption_path)
 
 
 def deliver_video(src: str, dst: str, opt: dict | None):
@@ -264,7 +264,7 @@ def deliver_video(src: str, dst: str, opt: dict | None):
         crf += 1
 
 
-def publish(pj, num, video, thumb, post_txt):
+def publish(pj, num, video, thumb, caption_txt):
     """完成フォルダ(project.yaml の publish_dir)に、物件ごとに 動画・サムネ・キャプション をまとめる。
     publish_dir を Google ドライブ(パソコン版)の同期フォルダにすれば、そのままドライブに保存される。"""
     import shutil
@@ -280,7 +280,7 @@ def publish(pj, num, video, thumb, post_txt):
     deliver_video(video, os.path.join(d, f"{name}.mp4"), L.get("deliver"))
     if thumb:
         shutil.copy2(thumb, os.path.join(d, f"{name}_サムネ.jpg"))
-    shutil.copy2(post_txt, os.path.join(d, f"{name}_キャプション.txt"))
+    shutil.copy2(caption_txt, os.path.join(d, f"{name}_キャプション.txt"))   # キャプション本文だけ(そのまま貼れる)
     print(f"[完成] {d}")
     from . import drive_upload
     if drive_upload.configured():
@@ -325,12 +325,15 @@ def make_post_assets(args, cfg, fonts, props, plan, out_dir, stem, base_dir, cou
     caption = build_caption(num, props.get("caption_heading", ""), props.get("caption", ""))
     problems += check_post(num, props, caption, th, info.get("property_name", ""))
     pp = os.path.join(out_dir, f"{stem}_投稿.txt")
-    write_post_text(pp, num, props, caption, problems)
+    write_post_text(pp, num, props, caption, problems)   # 確認用(番号・冒頭テロップ・投稿タイトル・チェック結果つき)
+    cp = os.path.join(out_dir, f"{stem}_キャプション.txt")   # 納品用: キャプション本文だけ
+    with open(cp, "w", encoding="utf-8") as f:
+        f.write(caption)
     record_number(counter, num)
     print(f"  {pp}  (No.{num})")
     for p in problems:
         print(f"  ⚠ {p}")
-    return num, (tp if th.get("title") and photo is not None else None), pp
+    return num, (tp if th.get("title") and photo is not None else None), cp
 
 
 if __name__ == "__main__":

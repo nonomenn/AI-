@@ -20,15 +20,6 @@ def _font(path, size):
     return ImageFont.truetype(path, int(size), index=0)
 
 
-def _gradient(size, stops) -> Image.Image:
-    """縦グラデーション(RGB)。stops は上→下の色のリスト。"""
-    w, h = size
-    ys = np.linspace(0, 1, h)
-    pos = np.linspace(0, 1, len(stops))
-    cols = np.stack([np.interp(ys, pos, [c[i] for c in stops]) for i in range(3)], 1)
-    return Image.fromarray(np.repeat(cols[:, None, :], w, 1).astype(np.uint8), "RGB")
-
-
 def parse_gold(text: str) -> list[tuple[str, bool]]:
     """「《新築148㎡》×《ガレージ付き》の4LDK。」→ [(文字, ゴールドか), ...]"""
     out, gold = [], False
@@ -67,15 +58,47 @@ def _rich_line(chars, font_path, size, gold_stops, white, digit_scale=1.0, kana_
     for c, g, f in runs:
         (dg if g else dw).text((x, 4 * SS + asc), c, font=f, fill=255, anchor="ls")
         x += f.getlength(c)
-    grad = _gradient((W, H), gold_stops).convert("RGBA")
     out = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    grad.putalpha(mask_g)
-    out.alpha_composite(grad)
+    if mask_g.getbbox():
+        out.alpha_composite(metallic_gold(mask_g, gold_stops))
     wl = Image.new("RGBA", (W, H), tuple(white) + (0,))
     wl.putalpha(mask_w)
     out.alpha_composite(wl)
     bbox = out.getbbox()
     return out.crop((bbox[0], 0, bbox[2], H)) if bbox else out
+
+
+def metallic_gold(mask: Image.Image, gold: dict) -> Image.Image:
+    """光沢のあるゴールド文字(RGBA)。完成見本の再現:
+    文字の高さに合わせた金属的な縦グラデーション(上が明るい黄金、中に光の帯、下は琥珀色)
+    + 左上から光が当たる面取り(上側の縁を明るく、下側の縁を暗く) + 細い焦げ茶の縁取り。"""
+    a = np.asarray(mask, np.float32) / 255.0
+    H, W = a.shape
+    rows = np.where(a.max(1) > 0.1)[0]
+    y0, y1 = (rows.min(), rows.max()) if len(rows) else (0, H - 1)
+    t = np.clip((np.arange(H) - y0) / max(1, y1 - y0), 0, 1)
+    stops = gold["stops"]
+    pos = [s[0] for s in stops]
+    col = np.stack([np.interp(t, pos, [s[1 + i] for s in stops]) for i in range(3)], 1)   # (H, 3)
+    img = np.repeat(col[:, None, :], W, 1)
+    # 面取り: ぼかした文字形の傾きから、光の当たる縁(左上向き)と影の縁を作る
+    bl = np.asarray(Image.fromarray((a * 255).astype(np.uint8)).filter(
+        ImageFilter.GaussianBlur(gold["bevel"] * SS)), np.float32) / 255.0
+    gy, gx = np.gradient(bl)
+    light = -(gy * 0.85 + gx * 0.35)
+    light /= (np.abs(light).max() + 1e-6)
+    hi = np.clip(light, 0, 1)[..., None]
+    lo = np.clip(-light, 0, 1)[..., None]
+    img = img + (255 - img) * hi * gold["highlight"] - img * lo * gold["shade"]
+    body = Image.fromarray(np.clip(img, 0, 255).astype(np.uint8), "RGB").convert("RGBA")
+    body.putalpha(mask)
+    # 細い焦げ茶の縁取り(文字の輪郭をくっきりさせる)
+    w = max(1, int(round(gold["outline"] * SS)))
+    edge = mask.filter(ImageFilter.MaxFilter(w * 2 + 1))
+    out = Image.new("RGBA", mask.size, tuple(gold["outline_color"]) + (0,))
+    out.putalpha(edge)
+    out.alpha_composite(body)
+    return out
 
 
 def _fit(render, max_w, size, min_size=24):
@@ -151,7 +174,8 @@ def render_thumbnail(cfg: dict, fonts: dict, title: str, sub: str, bar: list[str
     # 情報バー(3分割。区切りの位置は文字量に合わせる)
     b = T["bar"]
     x0, x1, y0, y1 = b["x0"], b["x1"], b["y0"], b["y1"]
-    d.rectangle((x0 * SS, y0 * SS, x1 * SS, y1 * SS), outline=line_gold + (255,), width=b["border"] * SS)
+    d.rounded_rectangle((x0 * SS, y0 * SS, x1 * SS, y1 * SS), b.get("radius", 0) * SS, outline=line_gold + (255,),
+                        width=b["border"] * SS)
     items = [f"{CIRCLED[k]} {txt}" for k, txt in enumerate(bar[:3])]
     size = b["size"]
     fb = _font(f_text, size * SS)
@@ -166,7 +190,14 @@ def render_thumbnail(cfg: dict, fonts: dict, title: str, sub: str, bar: list[str
         w += extra
         if k:
             d.line((cx, y0 * SS, cx, y1 * SS), fill=line_gold + (255,), width=b["border"] * SS)
-        d.text((cx + w / 2, (y0 + y1) / 2 * SS), s, font=fb, fill=tuple(b["color"]) + (255,), anchor="mm")
+        # 丸数字はゴールド、本文は白に近い色(完成見本どおり)
+        num, rest = s[:1], s[1:]
+        fn = _font(f_text, size * b.get("number_scale", 1.0) * SS)
+        tw = fn.getlength(num) + fb.getlength(rest)
+        x = cx + w / 2 - tw / 2
+        cy = (y0 + y1) / 2 * SS
+        d.text((x, cy), num, font=fn, fill=tuple(b["number_color"]) + (255,), anchor="lm")
+        d.text((x + fn.getlength(num), cy), rest, font=fb, fill=tuple(b["color"]) + (255,), anchor="lm")
         cx += w
 
     # 物件写真(角丸+ゴールド枠)と再生ボタン

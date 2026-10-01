@@ -48,6 +48,24 @@ python -m autoedit.preview 物件動画/阿波座○○/出力/阿波座○○.m
 python -m autoedit.fonts 物件動画/共通/フォント
 ```
 
+## ドライブに自動保存
+
+完成品(`完成/No.L###_物件名/` の動画・サムネ・キャプション)を、実行のたびに Google ドライブの `完成動画/No.L###_物件名/` に保存できる。方法は2つ。
+
+**A. 自分のパソコンで動かす場合(いちばん簡単)**: 「Google ドライブ パソコン版」を入れ、`config/project.yaml` の `publish_dir` をドライブの同期フォルダ(例: `G:/マイドライブ/完成動画`)にする。それだけで自動で同期される。
+
+**B. クラウド(Claude Code)で動かす場合**: 自分の Google アカウントに「受け口」を1回だけ作る(5分)。
+
+1. https://script.google.com を開き「新しいプロジェクト」
+2. `tools/drive_upload.gs` の中身を全部貼り付け、`KEY` を自分で決めた長い文字列(合言葉)に変えて保存
+3. 右上の「デプロイ」→「新しいデプロイ」→ 種類「ウェブアプリ」。実行ユーザー「自分」、アクセスできるユーザー「全員」→「デプロイ」→ Google アカウントでアクセスを承認
+4. 表示された「ウェブアプリの URL」と合言葉を、環境の設定(画面上部の環境メニュー →「編集」)に環境変数として登録する
+   - `AUTOEDIT_DRIVE_URL` = ウェブアプリの URL
+   - `AUTOEDIT_DRIVE_KEY` = 合言葉
+   - 合言葉はチャットに書かない。次のセッションから有効になる
+
+合言葉を知っている人だけが保存でき、ドライブのパスワードや認証情報はツールに渡らない。1ファイル35MBまで(36秒前後の動画は約30MB)。手動で送るときは `python -m autoedit.drive_upload 物件動画/完成/No.L036_物件名`。
+
 ## デモ(同梱のテスト素材で実行)
 
 ```bash
@@ -82,6 +100,9 @@ autoedit/
   preview.py   TikTokのUI位置ガイドを重ねた確認画像
   thumbnail.py サムネイル(黒×ゴールドのテンプレート)
   post.py      物件番号・投稿タイトル・キャプションと納品前チェック
+  drive_upload.py  完成品を Google ドライブへ保存(tools/drive_upload.gs 経由)
+tools/
+  drive_upload.gs  ドライブ保存の受け口(自分の Google アカウントに置く Apps Script)
 config/
   project.yaml   物件フォルダの構成
   style.yaml     見た目の設定(位置・サイズ・書体・トランジション・矢印)

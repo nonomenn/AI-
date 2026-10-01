@@ -64,8 +64,8 @@ fonts:
     [ZenAntique-Regular.ttf, NotoSerifCJK-Bold.ttc, NotoSerifJP-Bold.otf, NotoSerifCJKjp-Bold.otf, NotoSerifJP-Bold.ttf, "ヒラギノ明朝 ProN.ttc", yumindb.ttf]
   latin_serif:   # 部屋名(英字セリフ)。今の動画の Premiere テキストスタイルは Zen Antique
     [ZenAntique-Regular.ttf, NotoSerifCJK-Regular.ttc, NotoSerifJP-Regular.otf, NotoSerifCJKjp-Regular.otf, NotoSerifJP-Regular.ttf, "ヒラギノ明朝 ProN.ttc", yumin.ttf]
-  heavy_serif_thumb:   # サムネのタイトル(極太明朝)
-    [NotoSerifCJK-Black.ttc, NotoSerifJP-Black.otf, NotoSerifCJKjp-Black.otf, NotoSerifJP-Black.ttf, "ヒラギノ明朝 ProN.ttc", yumindb.ttf]
+  heavy_serif_thumb:   # サムネのタイトル(太明朝。完成見本は Black より細い)
+    [NotoSerifCJK-Bold.ttc, NotoSerifCJK-Black.ttc, NotoSerifJP-Black.otf, NotoSerifCJKjp-Black.otf, NotoSerifJP-Black.ttf, "ヒラギノ明朝 ProN.ttc", yumindb.ttf]
   serif_bold_thumb:    # サムネのサブ・情報バー・物件番号
     [NotoSerifCJK-Bold.ttc, NotoSerifJP-Bold.otf, NotoSerifCJKjp-Bold.otf, NotoSerifJP-Bold.ttf, "ヒラギノ明朝 ProN.ttc", yumindb.ttf]
   sans_bold:     # CTA・ルームツアーSTART
@@ -172,14 +172,28 @@ thumbnail:
   width: 1149
   height: 1369
   fonts: {title: heavy_serif_thumb, text: serif_bold_thumb}
-  gold: [[255, 238, 178], [236, 196, 112], [196, 142, 58], [150, 100, 36]]   # 上→下のグラデーション
+  gold:                    # 光沢のあるゴールド(完成見本から採色)
+    stops:                 # [文字の高さの位置(0=上 1=下), R, G, B]
+      - [0.00, 255, 214, 102]
+      - [0.22, 255, 232, 140]
+      - [0.40, 255, 240, 168]    # 光の帯
+      - [0.55, 246, 200, 86]
+      - [0.75, 212, 146, 44]
+      - [0.88, 236, 184, 80]     # 下の照り返し
+      - [1.00, 168, 104, 26]
+    bevel: 1.6             # 面取りの幅(px)
+    highlight: 0.55        # 光が当たる縁の明るさ
+    shade: 0.35            # 影になる縁の暗さ
+    outline: 1.0           # 焦げ茶の縁取りの太さ(px)
+    outline_color: [70, 40, 8]
   line_gold: [201, 160, 84]
   white: [250, 248, 242]
   frame: {inset: 9, width: 2}                    # 外枠のゴールド線
   glow: {y: 42, width: 440, height: 3}          # 最上部の光るライン
-  title: {center_y: 128, size: 82, max_width: 1080, digit_scale: 1.22, kana_scale: 0.84}
-  sub: {center_y: 214, size: 44, max_width: 1040}
-  bar: {x0: 40, x1: 1108, y0: 276, y1: 362, border: 2, size: 36, color: [240, 222, 172]}
+  title: {center_y: 122, size: 82, max_width: 1010, digit_scale: 1.22, kana_scale: 0.84}
+  sub: {center_y: 210, size: 42, max_width: 1000}
+  bar: {x0: 40, x1: 1108, y0: 276, y1: 362, border: 2, radius: 8, size: 36, color: [246, 238, 222],
+        number_color: [236, 186, 82], number_scale: 1.3}
   photo: {x0: 33, y0: 384, x1: 1116, y1: 1258, radius: 26, border: 3}
   play: {center: [574, 790], radius: 112, stroke: 11}
   number: {center_y: 1308, size: 50, line_len: 125, line_gap: 38, line_width: 2}

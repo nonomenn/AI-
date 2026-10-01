@@ -232,6 +232,12 @@ def publish(pj, num, video, thumb, post_txt):
         shutil.copy2(thumb, os.path.join(d, f"{name}_サムネ.jpg"))
     shutil.copy2(post_txt, os.path.join(d, f"{name}_キャプション.txt"))
     print(f"[完成] {d}")
+    from . import drive_upload
+    if drive_upload.configured():
+        try:
+            drive_upload.upload_folder(d)
+        except Exception as e:  # noqa: BLE001 — ドライブに送れなくても完成フォルダは手元に残る
+            print(f"  ⚠ ドライブへの保存に失敗しました({e})。手元の完成フォルダは作成済みです")
 
 
 def make_post_assets(args, cfg, fonts, props, plan, out_dir, stem, base_dir, counter, thumb_photo=None):

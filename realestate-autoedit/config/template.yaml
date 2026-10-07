@@ -1,14 +1,14 @@
 # ============================================================
 #  動画の構成テンプレート(現状のTOALU動画の構成を踏襲)
-#  見所映像 → 広告 → 部屋紹介 → 映える映像 + コメント誘導
+#  見所映像 → キャッチ → 共用部 → 部屋紹介 → 広告 → 映える映像 + コメント誘導
 # ============================================================
 
 sections:
   - id: hook              # 見所映像(掴み)
     telop: hook
     shots: 1
-    duration: 3.2          # コピーを読み切れて、映像も味わえる長さ
-    prefer: [exterior, view, living, balcony]   # この順に探し、なければ「映え度」が高いカット
+    duration: 2.6          # TikTokは1秒で流されるので、短いコピー(全角10文字以内)を一瞬で読ませて次へ
+    prefer: [view, living, balcony, exterior]   # 室内・眺望の一番映えるカットから入る(外観は最後の候補)。なければ「映え度」が高いカット
     by_beauty: true
     avoid: [bathroom, toilet, washroom, closet, corridor]
 
@@ -21,10 +21,6 @@ sections:
     by_appeal: true        # 物件で一番映えるカット(見どころ優先)を冒頭に持ってきて、引きを強くする
     by_beauty: true
     avoid: [bathroom, toilet, washroom, closet]   # 水回りはキャッチに使わない
-
-  - id: ad                # 広告(静止画)。動かさずに2.5秒見せる
-    kind: image
-    duration: 2.5
 
   - id: common            # 共用部(マンションの外観・緑・エントランス・ロビー)。部屋に入る前に建物の魅力を見せる。素材が無ければ省く
     kind: common
@@ -57,6 +53,10 @@ sections:
     only_if_few: [toilet]  # 映えにくいので、部屋紹介の部屋数が min_rooms に足りないときだけ入れる
     max_room_shots: 9      # 部屋紹介のカット数の上限(見どころ込み、廊下のつなぎは除く)。多いと忙しく見えるので、減らして1カットを長く見せる
     order: [living, dining, kitchen, bedroom, western_room, japanese_room, closet, washroom, bathroom, toilet]
+
+  - id: ad                # 広告(静止画)。動かさずに2.5秒見せる。冒頭の直後に入れると離脱されやすいので、部屋紹介のあと・最後の見せ場の前に置く
+    kind: image
+    duration: 2.5
 
   - id: cta               # 映える映像 + コメント誘導
     telop: cta

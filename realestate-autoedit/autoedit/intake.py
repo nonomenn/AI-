@@ -101,8 +101,8 @@ TikTok用ルームツアー動画(高級賃貸・TOALU ESTATE)のために、次
    (3) 立地のブランド(梅田・北浜・心斎橋・本町 など、名前だけで伝わるエリア)
    (4) 新築・デザイン性
  使わないもの: 弱みになる数字(徒歩10分超、築年数が古い)、設備の羅列、どの物件にも言える言葉(素敵なお部屋 等)
- hook_candidates: 動画冒頭テロップ(0〜3秒・1行・全角14文字以内)を、次の3つの型で1案ずつ、この順に:
-   [0] 憧れの暮らし型: その物件で叶う暮らしを一言で。例「愛犬と、ガレージのある新築へ。」
+ hook_candidates: 動画冒頭テロップ(0〜2.6秒・1行・全角10文字以内。一瞬で読める短さ)を、次の3つの型で1案ずつ、この順に:
+   [0] 憧れの暮らし型: その物件で叶う暮らしを一言で。例「ガレージ付き新築へ。」
    [1] 問いかけ・意外性型: 見る人の予想を裏切る。例「賃貸で、この広さ。」
    [2] 数字の断言型: いちばん強い数字を言い切る。例「148㎡、新築の4LDK。」
  catch_candidates: hook の直後に出すキャッチ(2行、改行は \\n。各行 全角12文字以内)を3案。hook の言葉を事実で裏付ける
@@ -194,9 +194,9 @@ def choose_copy(facts: dict) -> tuple[str, str, list[str], list[str]]:
             (good if all(_visible_len(ln) <= max_len for ln in c.split("\n")) else ok).append(c)
         return (good + ok), bool(good)
 
-    hooks, fit = pick(facts.get("hook_candidates", []), lambda s: s.strip().replace("\n", ""), 14)
+    hooks, fit = pick(facts.get("hook_candidates", []), lambda s: s.strip().replace("\n", ""), 10)
     if hooks and not fit:
-        notes.append("hook がどの案も14文字を超えています(自動で縮小して表示されます)")
+        notes.append("hook がどの案も10文字を超えています(自動で縮小して表示されます)")
     catches, fit = pick(facts.get("catch_candidates", []), lambda s: normalize_catch(s, station), 12)
     if catches and not fit:
         notes.append("キャッチの行がどの案も12文字を超えています(自動で縮小して表示されます)")

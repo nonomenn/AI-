@@ -22,7 +22,7 @@ def _sec(tpl, sid):
 def test_plan_structure_and_duration(cfg, tpl):
     plan = build_plan(full_pool(), cfg, tpl, "ad.png", log=lambda *_: None)
     sections = [p.section for p in plan]
-    order = ["hook", "catch", "ad", "common", "start", "rooms", "cta"]
+    order = ["hook", "catch", "common", "start", "rooms", "ad", "cta"]
     assert [s for i, s in enumerate(sections) if i == 0 or sections[i - 1] != s] == order
     _, total = timeline(plan)
     assert cfg["duration"]["min"] <= total <= cfg["duration"]["max"] + 0.01
@@ -201,7 +201,7 @@ def test_common_area_before_tour(cfg, tpl):
             seg(8, "western_room"), seg(9, "balcony", beauty=8), seg(10, "view", beauty=9)]
     plan = build_plan(pool, cfg, tpl, "ad.png", log=lambda *_: None, highlights=hl)
     secs = [p.section for p in plan]
-    assert secs.index("ad") < secs.index("common") < secs.index("start") < secs.index("rooms")
+    assert secs.index("catch") < secs.index("common") < secs.index("start") < secs.index("rooms") < secs.index("ad") < secs.index("cta")
     common = [p for p in plan if p.section == "common"]
     assert all(p.telop == "room" for p in common)
     assert [p.room for p in common][-2:] == ["lobby", "entrance_hall"]   # 外観 → エントランス(見どころが先)
@@ -255,3 +255,14 @@ def test_same_take_not_reused_and_tour_follows_first_visit(cfg, tpl):
     assert not (a.id in used and a_next.id in used)
     tour = [p.room for p in plan if p.section == "rooms"]
     assert tour[0] == "living"                             # LDKは最初に入った位置(10秒)で並ぶ
+
+
+def test_hook_starts_inside_and_ad_comes_late(cfg, tpl):
+    """冒頭は室内・眺望の映えるカットから(外観は最後の候補)。広告は冒頭の直後ではなく、最後の見せ場の前。"""
+    pool = [seg(0, "exterior", beauty=9), seg(1, "view", beauty=8), seg(2, "living", beauty=9),
+            seg(3, "living", beauty=8), seg(4, "kitchen", beauty=8), seg(5, "corridor"),
+            seg(6, "western_room"), seg(7, "balcony", beauty=8)]
+    plan = build_plan(pool, cfg, tpl, "ad.png", log=lambda *_: None)
+    assert plan[0].section == "hook" and plan[0].room != "exterior"
+    secs = [p.section for p in plan]
+    assert secs.index("ad") > secs.index("rooms") and secs[-1] == "cta"

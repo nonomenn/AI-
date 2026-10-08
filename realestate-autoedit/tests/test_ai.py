@@ -144,3 +144,12 @@ def test_manual_labels_trim_to_range(tmp_path):
     vision.apply_manual_labels([straddle, too_short], str(lab))
     assert straddle.room == "washroom" and straddle.start >= 23.3 and straddle.end <= 26.0
     assert too_short.is_transit
+
+
+def test_rent_in_hook_must_be_a_band():
+    """冒頭に家賃を出すときは「10万円台」とぼかす。正確な金額の案は使わない。"""
+    from autoedit.intake import choose_copy
+    hook, _, _, notes = choose_copy({"hook_candidates": ["家賃105,000円", "梅田7分で10万円台", "LDK20帖"],
+                                     "catch_candidates": ["《梅田》7分の\\n1LDK"]})
+    assert hook == "梅田7分で10万円台"
+    assert any("ぼかして" in n for n in notes)

@@ -85,8 +85,8 @@ def test_motion_mismatch_uses_dissolve(cfg, tpl):
 def test_adaptive_slow(cfg, tpl):
     fast, slow = seg(0, "living"), seg(1, "kitchen")
     fast.speed, slow.speed = 0.30, 0.10   # 画面幅/秒
-    plan = build_plan([fast, slow, seg(2, "balcony")], cfg, tpl, None, log=lambda *_: None)
-    sp = {p.seg.id: p.speed for p in plan if p.seg}
+    plan = build_plan([fast, slow, seg(2, "balcony"), seg(3, "view", beauty=9)], cfg, tpl, None, log=lambda *_: None)
+    sp = {p.seg.id: p.speed for p in plan if p.seg and p.section != "hook"}
     assert sp[fast.id] == 0.5 and sp[slow.id] == 0.8   # 速いカットほど遅く(60fpsの下限0.5)
 
 
@@ -94,13 +94,14 @@ def test_slow_motion(cfg, tpl):
     import copy
     pool = [seg(0, "living", fps=60), seg(1, "kitchen", fps=30), seg(2, "balcony", fps=60)]
     plan = build_plan(pool, cfg, tpl, None, log=lambda *_: None)
-    for p in plan:  # 60fps はそのままスロー、30fps は中間コマを作ってスロー
+    assert plan[0].section == "hook" and plan[0].speed == 1.0 and plan[0].interp == ""   # 冒頭だけ通常速度
+    for p in plan[1:]:  # 60fps はそのままスロー、30fps は中間コマを作ってスロー
         assert p.speed == 0.8
         assert p.interp == ("" if p.seg.fps >= 50 else "blend")
     c2 = copy.deepcopy(cfg)
     c2["motion"]["low_fps_interp"] = "none"
     plan = build_plan(pool, c2, tpl, None, log=lambda *_: None)
-    for p in plan:
+    for p in plan[1:]:
         assert p.speed == (0.8 if p.seg.fps >= 50 else 1.0) and p.interp == ""
 
 

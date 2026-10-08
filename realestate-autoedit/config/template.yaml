@@ -8,6 +8,7 @@ sections:
     telop: hook
     shots: 1
     duration: 2.6          # TikTokは1秒で流されるので、短いコピー(全角10文字以内)を一瞬で読ませて次へ
+    speed: 1.0             # 冒頭のカットだけスローにしない(1秒目で「動いている・変化がある」と感じさせる)。スローは2カット目から
     prefer: [view, living, balcony, exterior]   # 室内・眺望の一番映えるカットから入る(外観は最後の候補)。なければ「映え度」が高いカット
     by_beauty: true
     avoid: [bathroom, toilet, washroom, closet, corridor]

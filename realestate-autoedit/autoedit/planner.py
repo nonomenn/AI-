@@ -56,9 +56,9 @@ def _usable(seg: Segment) -> bool:
     return not seg.is_transit
 
 
-def _take(seg: Segment, want: float, cfg, section: str, room: str = "", telop=None) -> Shot:
-    """区間から、欲しい尺ぶんを切り出す(区間の中央寄りを使う)。"""
-    speed = _speed_for(seg, cfg)
+def _take(seg: Segment, want: float, cfg, section: str, room: str = "", telop=None, speed=None) -> Shot:
+    """区間から、欲しい尺ぶんを切り出す(区間の中央寄りを使う)。speed を指定するとその速さ(冒頭は通常速度)。"""
+    speed = speed or _speed_for(seg, cfg)
     src_len = min(seg.duration, want * speed)
     dur = src_len / speed
     src_start = seg.start + (seg.duration - src_len) / 2
@@ -172,7 +172,7 @@ def build_plan(segs: list[Segment], cfg: dict, tpl: dict, ad_image: str | None, 
             if s:
                 used.add(s.id)
                 chosen.append(s)
-                plan.append(_take(s, sec["duration"], cfg, "hook", telop="hook"))
+                plan.append(_take(s, sec["duration"], cfg, "hook", telop="hook", speed=sec.get("speed")))
         elif sid == "catch":
             per = sec["duration"] / sec["shots"]
             first = True

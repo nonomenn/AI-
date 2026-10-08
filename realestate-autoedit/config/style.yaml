@@ -92,7 +92,7 @@ telops:
     shadow:
       - {offset: [9, 10], blur: 4, color: [0, 0, 0], opacity: 0.45}             # 押し出し影の下のやわらかい影
       - {offset: [6, 6], blur: 0, extrude: true, color: [0, 0, 0], opacity: 1.0}  # くっきりした黒の押し出し影(立体的)
-    fade_in: 0.35
+    fade_in: 0.0                 # 1コマ目から文字を出す(フワッと出すと、読む前に流される)
     fade_out: 0.3
 
   catch:           # キャッチ + 傍点。今の動画: 傍点〜2行目で y367〜600、行の間隔100px、傍点の半径17px

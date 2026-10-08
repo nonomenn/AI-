@@ -37,7 +37,8 @@ def test_project_mode_end_to_end(tmp_path):
     secs = [x["section"] for x in plan["plan"]]
     assert secs[0] == "hook" and "ad" in secs and secs[-1] == "cta"
     # 60fps素材は0.8倍。カメラが速いカットほどさらにスロー(下限0.5倍)
-    assert all(0.5 <= x["speed"] <= 0.8 for x in plan["plan"] if x["section"] != "ad")
+    assert all(0.5 <= x["speed"] <= 0.8 for x in plan["plan"] if x["section"] not in ("ad", "hook"))
+    assert plan["plan"][0]["section"] == "hook" and plan["plan"][0]["speed"] == 1.0   # 冒頭だけ通常速度
     a = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=duration",
                         "-of", "csv=p=0", str(out)], capture_output=True, text=True).stdout.strip()
     assert abs(float(a) - plan["total"]) < 0.2  # BGMがループして最後まで鳴る
